@@ -88,9 +88,6 @@
 		<None Update="2c11c0ec90a821ecc3dac6b81db355b2a2ff9f15e1d4f9512f3a96380c980887.achu">
 		  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</None>
-		<None Update="bnetserver.p12">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</None>
 		<None Update="config.ini">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>

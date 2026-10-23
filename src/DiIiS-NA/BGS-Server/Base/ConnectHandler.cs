@@ -26,10 +26,11 @@ namespace DiIiS_NA.LoginServer.Base
             Logger.Info("Request of new Client - IP: - {0}", socketChannel.RemoteAddress);
             IChannelPipeline p = socketChannel.Pipeline;
 
-            var Certificate = new X509Certificate2("bnetserver.p12", "123");
+            var Certificate = LocalCertificate.Load();
             TlsHandler TLS = TlsHandler.Server(Certificate);
 
             p.AddLast(TLS);
+            p.AddLast(new FirstReadLogger());
             p.AddLast(new HttpServerCodec());
             p.AddLast(new HttpObjectAggregator(8192));
             //p.AddLast(new WebSocketServerProtocolHandler("/", "jsonrpc.aurora.v1.30.battle.net", true));
@@ -47,6 +48,52 @@ namespace DiIiS_NA.LoginServer.Base
             return bytes;
         }
     }
+    /// <summary>
+    /// Logs the TLS handshake result, connection errors and the start of the first decrypted data,
+    /// to see what a new client version sends.
+    /// </summary>
+    internal class FirstReadLogger : ChannelHandlerAdapter
+    {
+        private static readonly Logger Logger = LogManager.CreateLogger("BlizzLess.Net System");
+
+        public override void UserEventTriggered(IChannelHandlerContext ctx, object evt)
+        {
+            if (evt is TlsHandshakeCompletionEvent tls)
+            {
+                if (tls.IsSuccessful)
+                    Logger.Debug("TLS handshake with {0} completed", ctx.Channel.RemoteAddress);
+                else
+                    Logger.ErrorException(tls.Exception, "TLS handshake with {0} failed", ctx.Channel.RemoteAddress);
+            }
+
+            ctx.FireUserEventTriggered(evt);
+        }
+
+        public override void ExceptionCaught(IChannelHandlerContext ctx, Exception cause)
+        {
+            Logger.ErrorException(cause, "Connection error from {0}", ctx.Channel.RemoteAddress);
+            ctx.FireExceptionCaught(cause);
+        }
+
+        public override void ChannelRead(IChannelHandlerContext ctx, object msg)
+        {
+            if (msg is IByteBuffer buffer)
+            {
+                var length = Math.Min(buffer.ReadableBytes, 512);
+                var text = new StringBuilder(length);
+                for (var i = 0; i < length; i++)
+                {
+                    var b = buffer.GetByte(buffer.ReaderIndex + i);
+                    text.Append(b >= 0x20 && b < 0x7F ? (char)b : '.');
+                }
+                Logger.Debug("First {0} of {1} bytes from client: {2}", length, buffer.ReadableBytes, text);
+            }
+
+            ctx.FireChannelRead(msg);
+            ctx.Channel.Pipeline.Remove(this);
+        }
+    }
+
     public class HandshakeHandler : WebSocketProtocolHandler
     {
         public sealed class HandshakeComplete
@@ -281,9 +328,21 @@ namespace DiIiS_NA.LoginServer.Base
 
         public override void ChannelRead(IChannelHandlerContext ctx, object msg)
         {
-            IFullHttpRequest req = (IFullHttpRequest)msg;
+            if (msg is not IFullHttpRequest req)
+            {
+                _logger.Error("Expected a WebSocket upgrade request, got {0}", msg?.GetType().Name ?? "null");
+                ctx.FireChannelRead(msg);
+                return;
+            }
+
+            var headers = new StringBuilder();
+            foreach (var header in req.Headers)
+                headers.Append(header.Key).Append(": ").Append(header.Value).Append("; ");
+            _logger.Debug("WebSocket upgrade request: {0} {1} (decode: {2}) {3}", req.Method, req.Uri, req.Result, headers);
+
             if (IsNotWebSocketPath(req))
             {
+                _logger.Warn("Request path {0} does not match the WebSocket path {1}", req.Uri, websocketPath);
                 ctx.FireChannelRead(msg);
                 return;
             }
@@ -313,10 +372,12 @@ namespace DiIiS_NA.LoginServer.Base
                 {
                     if (t.Status != TaskStatus.RanToCompletion)
                     {
+                        _logger.ErrorException(t.Exception, "WebSocket handshake failed");
                         ctx.FireExceptionCaught(t.Exception);
                     }
                     else
                     {
+                        _logger.Debug("WebSocket handshake complete, subprotocol: {0}", handshaker.SelectedSubprotocol ?? "none");
                         ctx.FireUserEventTriggered(new HandshakeHandler.HandshakeComplete(req.Uri, req.Headers,
                             handshaker.SelectedSubprotocol));
                     }
