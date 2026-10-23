@@ -165,8 +165,6 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 		/// </summary>
 		public bool Paused { get; private set; }
 
-		private bool _updateEnabled = true;
-
 		/// <summary>
 		/// Starting world for the game.
 		/// </summary>
@@ -285,14 +283,15 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 		public GameDBSession GameDbSession;
 
 		/// <summary>
-		/// Update frequency for the game - 100 ms.
+		/// Update frequency for the game - 50 ms. Messages are flushed once per update, so this is also the
+		/// added latency; it was 100 ms, which felt like ping lag even on a local server.
 		/// </summary>
-		public readonly long UpdateFrequency = 100;
+		public readonly long UpdateFrequency = 50;
 
 		/// <summary>
-		/// Incremented tick value on each Game.Update().
+		/// Incremented tick value on each Game.Update(). Keep TickRate * 1000 / UpdateFrequency at 60 ticks per second.
 		/// </summary>
-		public readonly int TickRate = 6;
+		public readonly int TickRate = 3;
 
 		/// <summary>
 		/// Tick counter.
@@ -504,7 +503,7 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 					 MissedTicks)); // +6 ticks per 100ms. Verified by setting LogoutTickTimeMessage.Ticks to 600 which eventually renders a 10 sec logout timer on client. /raist
 				MissedTicks = 0;
 
-				if (_updateEnabled && !Paused)
+				if (!Paused)
 				{
 					// Lock Game instance to prevent incoming messages from modifying state while updating
 					// only update worlds with active players in it - so mob brain()'s in empty worlds doesn't get called and take actions for nothing. /raist.
@@ -530,6 +529,7 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 				}
 
 				tickWatch.Stop();
+				RecordUpdateTime(tickWatch.Elapsed.TotalMilliseconds);
 
 				Stopwatch calcWatch = new();
 				calcWatch.Start();
@@ -566,6 +566,31 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 			}
 		}
 
+		private const int UpdateStatsSeconds = 30;
+		private readonly Stopwatch _updateStatsWatch = Stopwatch.StartNew();
+		private double _updateTimeTotal, _updateTimeMax;
+		private int _updateCount, _updatesOverBudget;
+
+		/// <summary>
+		/// Logs how long game updates took every <see cref="UpdateStatsSeconds"/> seconds, to tell server lag apart from
+		/// network or client lag.
+		/// </summary>
+		private void RecordUpdateTime(double milliseconds)
+		{
+			_updateCount++;
+			_updateTimeTotal += milliseconds;
+			_updateTimeMax = Math.Max(_updateTimeMax, milliseconds);
+			if (milliseconds > UpdateFrequency) _updatesOverBudget++;
+			if (_updateStatsWatch.Elapsed.TotalSeconds < UpdateStatsSeconds) return;
+
+			Logger.Debug("Updates in the last {0}s: {1}, average {2:0.0} ms, slowest {3:0.0} ms, {4} over the {5} ms budget.",
+				UpdateStatsSeconds, _updateCount, _updateTimeTotal / _updateCount, _updateTimeMax, _updatesOverBudget,
+				UpdateFrequency);
+			_updateCount = _updatesOverBudget = 0;
+			_updateTimeTotal = _updateTimeMax = 0;
+			_updateStatsWatch.Restart();
+		}
+
 		#endregion
 
 		#region game-message handling & routing
@@ -577,7 +602,9 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 		/// <param name="message"></param>
 		public void Route(GameClient client, GameMessage message)
 		{
-			_updateEnabled = false;
+			// Wait for a running update rather than switching updates off: the client sends messages constantly
+			// while moving and fighting, and every one that overlapped an update used to skip that whole update.
+			lock (_updateLock)
 			try
 			{
 				switch (message.Consumer)
@@ -605,10 +632,6 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 			catch (Exception e)
 			{
 				Logger.WarnException(e, "Unhandled exception caught:");
-			}
-			finally
-			{
-				_updateEnabled = true;
 			}
 		}
 

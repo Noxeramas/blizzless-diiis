@@ -170,9 +170,17 @@ public class AnsiTarget : LogTarget
         #endif
         )).LeftJustified();
         var colError = new Markup(isError ? exMessage : "", exStyle).RightJustified();
-        if (IncludeTimeStamps) _table.AddRow(colTimestamp, colLevel, colMessage, colLogger, colError);
-        else _table.AddRow(colLevel, colMessage, colLogger, colError);
+        lock (_table)
+        {
+            if (IncludeTimeStamps) _table.AddRow(colTimestamp, colLevel, colMessage, colLogger, colError);
+            else _table.AddRow(colLevel, colMessage, colLogger, colError);
+            // the live view redraws every row, so an unbounded table made logging slower the longer the server ran
+            while (_table.Rows.Count > MaxRows)
+                _table.Rows.RemoveAt(0);
+        }
     }
+
+    private const int MaxRows = 100;
 
     private string StripMarkup(string message)
     {

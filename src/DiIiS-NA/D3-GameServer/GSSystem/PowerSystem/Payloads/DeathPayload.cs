@@ -766,8 +766,8 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 
 						plr3.InGameClient.Game.LastTieredRiftTimeout =
 							(int)((plr3.InGameClient.Game.TiredRiftTimer.TimeoutTick -
-							       plr3.InGameClient.Game.TickCounter) / plr3.InGameClient.Game.TickRate /
-								plr3.InGameClient.Game.UpdateFrequency * 10f);
+							       plr3.InGameClient.Game.TickCounter) * plr3.InGameClient.Game.UpdateFrequency /
+								(plr3.InGameClient.Game.TickRate * 1000f));
 						plr3.InGameClient.Game.TiredRiftTimer.Stop();
 						plr3.InGameClient.Game.TiredRiftTimer = null;
 

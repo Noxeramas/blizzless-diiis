@@ -40,7 +40,7 @@ namespace DiIiS_NA.Core.Logging
 				Directory.CreateDirectory($"{LogConfig.Instance.LoggingRoot}/{_fileTimestamp}");
 
 			_fileStream = new FileStream(_filePath, reset ? FileMode.Create : FileMode.Append, FileAccess.Write, FileShare.Read); // init the file stream.
-			_logStream = new StreamWriter(_fileStream) { AutoFlush = true }; // init the stream writer.
+			_logStream = new StreamWriter(_fileStream); // init the stream writer; CheckQueue flushes after each batch.
 			TaskQueue = new ConcurrentQueue<Action>();
 			LoggerThread = new Thread(CheckQueue) { Name = "Logger", IsBackground = true };
 			LoggerThread.Start();
@@ -50,10 +50,17 @@ namespace DiIiS_NA.Core.Logging
 		{
 			while (true)
 			{
-				if (TaskQueue.TryDequeue(out var action))
+				// write everything queued, then flush once; one entry per sleep fell behind during busy updates
+				var wrote = false;
+				while (TaskQueue.TryDequeue(out var action))
+				{
 					action.Invoke();
+					wrote = true;
+				}
+				if (wrote && !_disposed)
+					_logStream.Flush();
 
-				Thread.Sleep(1);
+				Thread.Sleep(10);
 			}
 		}
 
@@ -69,10 +76,11 @@ namespace DiIiS_NA.Core.Logging
 		/// <param name="message">Log message.</param>
 		public override void LogMessage(Logger.Level level, string logger, string message)
 		{
+			var now = DateTime.Now; // when it was logged, not when the logger thread gets to it
 			TaskQueue.Enqueue(() =>
 			{
 				message = NoColors(message);
-				var timeStamp = IncludeTimeStamps ? "[" + DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss.fff") + "] " : "";
+				var timeStamp = IncludeTimeStamps ? "[" + now.ToString("dd.MM.yyyy HH:mm:ss.fff") + "] " : "";
 				if (!_disposed) // make sure we're not disposed.
 				{
 					/*
@@ -97,10 +105,11 @@ namespace DiIiS_NA.Core.Logging
 		/// <param name="exception">Exception to be included with log message.</param>
 		public override void LogException(Logger.Level level, string logger, string message, Exception exception)
 		{
+			var now = DateTime.Now;
 			TaskQueue.Enqueue(() =>
 			{
 				message = NoColors(message);
-				var timeStamp = IncludeTimeStamps ? "[" + DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss.fff") + "] " : "";
+				var timeStamp = IncludeTimeStamps ? "[" + now.ToString("dd.MM.yyyy HH:mm:ss.fff") + "] " : "";
 				if (!_disposed) // make sure we're not disposed.
 				{
 					_logStream.WriteLine(

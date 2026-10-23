@@ -296,6 +296,7 @@ namespace DiIiS_NA.Core.Logging
 		/// <param name="header"><see cref="bgs.protocol.Header"/> header</param>
 		public void LogIncomingPacket(Google.ProtocolBuffers.IMessage message, bgs.protocol.Header header)
 		{
+			if (!LogManager.IsEnabled(Level.PacketDump)) return; // skip building the dump text
 			Log(Level.PacketDump, ShortHeader(header) + "[I(M)] " + message.AsText(), null);
 		}
 		//*
@@ -305,6 +306,7 @@ namespace DiIiS_NA.Core.Logging
 		/// <param name="message">Gameserver packet to log.</param>
 		public void LogIncomingPacket(GameMessage message)
 		{
+			if (!LogManager.IsEnabled(Level.PacketDump)) return; // skip building the dump text
 			Log(Level.PacketDump, "[I(G)] " + message.AsText(), null);
 		}
 		//*/
@@ -315,6 +317,7 @@ namespace DiIiS_NA.Core.Logging
 		/// <param name="header"><see cref="bgs.protocol.Header"/> header</param>
 		public void LogOutgoingPacket(Google.ProtocolBuffers.IMessage message, bgs.protocol.Header header)
 		{
+			if (!LogManager.IsEnabled(Level.PacketDump)) return; // skip building the dump text
 			Log(Level.PacketDump, ShortHeader(header) + "[O(M)] " + message.AsText(), null);
 		}
 		//*
@@ -324,6 +327,7 @@ namespace DiIiS_NA.Core.Logging
 		/// <param name="message">Gameserver packet to log.</param>
 		public void LogOutgoingPacket(GameMessage message)
 		{
+			if (!LogManager.IsEnabled(Level.PacketDump)) return; // skip building the dump text
 			Log(Level.PacketDump, "[O(G)] " + message.AsText(), null);
 		}
 		//*/

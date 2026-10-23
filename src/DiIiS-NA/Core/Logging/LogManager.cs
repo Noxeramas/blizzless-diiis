@@ -54,5 +54,11 @@ namespace DiIiS_NA.Core.Logging
 		{
 			Targets.Add(target);
 		}
+
+		/// <summary>
+		/// Whether any target records messages of this level, so callers can skip building costly messages.
+		/// </summary>
+		public static bool IsEnabled(Logger.Level level) =>
+			Targets.Count == 0 || Targets.Exists(target => level >= target.MinimumLevel && level <= target.MaximumLevel);
 	}
 }

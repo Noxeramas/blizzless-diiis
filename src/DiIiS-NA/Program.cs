@@ -100,6 +100,8 @@ namespace DiIiS_NA
 
             DbProviderFactories.RegisterFactory("Npgsql", NpgsqlFactory.Instance);
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            if (OperatingSystem.IsWindows())
+                timeBeginPeriod(1);
 
             string name = $"Blizzless: Build {BUILD}, Stage: {STAGE} - {TypeBuild}";
             SetTitle(name);
@@ -459,6 +461,10 @@ namespace DiIiS_NA
         
         [DllImport("kernel32.dll", ExactSpelling = true)]
         static extern IntPtr GetConsoleWindow();
+
+        // Thread.Sleep defaults to ~15.6 ms granularity on Windows; the 50 ms game loop needs 1 ms to keep time.
+        [DllImport("winmm.dll", ExactSpelling = true)]
+        static extern uint timeBeginPeriod(uint uPeriod);
 
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
 

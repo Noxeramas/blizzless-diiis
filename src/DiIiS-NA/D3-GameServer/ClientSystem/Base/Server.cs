@@ -73,6 +73,7 @@ namespace DiIiS_NA.GameServer.ClientSystem.Base
 			{
 				//TSocketType newSocket = (TSocketType)Activator.CreateInstance(typeof(TSocketType), sock);
 				//newSocket.Start();
+				sock.NoDelay = true; // don't let Nagle hold back small game updates
 				var conn = new Connection(sock);
 				conn.Server = this;
 				NetThread.AddSocket(conn);

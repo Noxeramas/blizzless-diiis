@@ -17,7 +17,14 @@ namespace DiIiS_NA.GameServer.GSSystem.ObjectsSystem
 	public class GameAttributeMap
 	{
 		private static Logger Logger = LogManager.CreateLogger();
+		private static readonly HashSet<int> ReportedIllegalAssignments = new();
 		public FixedMap FixedMap { get; } = new();
+
+		private static bool ReportIllegalAssignment(int attributeId)
+		{
+			lock (ReportedIllegalAssignments)
+				return ReportedIllegalAssignments.Add(attributeId);
+		}
 
 		public struct KeyId
 		{
@@ -445,7 +452,8 @@ namespace DiIiS_NA.GameServer.GSSystem.ObjectsSystem
 		private void SetAttributeValue<T>(GameAttributeTyped<T> attribute, int? key, GameAttributeValue value)
 		{
 			// error if scripted attribute and is not settable
-			if (attribute.ScriptFunc != null && !attribute.ScriptedAndSettable)
+			// reported once per attribute: reading the caller's file and line is slow, and monsters hit this on every spawn
+			if (attribute.ScriptFunc != null && !attribute.ScriptedAndSettable && ReportIllegalAssignment(attribute.Id))
 			{
 				var frame = new System.Diagnostics.StackFrame(2, true);
 				Logger.Error("illegal value assignment for GameAttributes.{0} attempted at {1}:{2}",
