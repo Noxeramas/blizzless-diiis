@@ -25,7 +25,7 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Fields
             buffer.WriteInt(32, annItem);
             buffer.WriteInt(2, Field1.Length);
             for (int i = 0; i < Field1.Length; i++) buffer.WriteInt(32, Field1[i]);
-            field2 = buffer.ReadInt(32);
+            buffer.WriteInt(32, field2);
         }
 
         public void AsText(StringBuilder b, int pad)

@@ -65,7 +65,10 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Fields
             switch (Attribute.EncodingType)
             {
                 case GameAttributeEncoding.Int:
-                    buffer.WriteInt(Attribute.BitCount, Int);
+                    // Narrow Ints store their value pre-shifted by -min; a negative one (such as an unshifted
+                    // -1 "none") has no raw form and would reach the client out of range, so shift it here.
+                    var raw = Attribute.BitCount < 32 && Int < 0 ? Int - Attribute.MinAttributeValue.Value : Int;
+                    buffer.WriteInt(Attribute.BitCount, raw);
                     break;
                 case GameAttributeEncoding.IntMinMax:
                     buffer.WriteInt(Attribute.BitCount, Int - Attribute.MinAttributeValue.Value);

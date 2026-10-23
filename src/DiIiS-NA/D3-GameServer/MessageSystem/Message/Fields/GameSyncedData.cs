@@ -45,7 +45,7 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Fields
 
         public void Parse(GameBitBuffer buffer)
         {
-            GameSyncedFlags = buffer.ReadInt(4);
+            GameSyncedFlags = buffer.ReadInt(5); // 5 bits since 2.8.0
             Act = buffer.ReadInt(32);
             InitialMonsterLevel = buffer.ReadInt(32);
             MonsterLevel = buffer.ReadInt(32);
@@ -85,7 +85,7 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Fields
 
         public void Encode(GameBitBuffer buffer)
         {
-            buffer.WriteInt(4, GameSyncedFlags);
+            buffer.WriteInt(5, GameSyncedFlags); // 5 bits since 2.8.0
             buffer.WriteInt(32, Act);
             buffer.WriteInt(32, InitialMonsterLevel);
             buffer.WriteInt(32, MonsterLevel);

@@ -13,6 +13,7 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Fields
             public int LastPlayedAct;
             public int HighestUnlockedAct;
             public int PlayedFlags;
+            public int Field3; // added in 2.8.0; meaning unknown
             public PlayerSavedData PlayerSavedData;
             public PlayerQuestRewardHistoryEntry[] tQuestRewardHistory;
 
@@ -21,6 +22,7 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Fields
                 LastPlayedAct = buffer.ReadInt(32);
                 HighestUnlockedAct = buffer.ReadInt(32);
                 PlayedFlags = buffer.ReadInt(32);
+                Field3 = buffer.ReadInt(32);
                 PlayerSavedData = new PlayerSavedData();
                 PlayerSavedData.Parse(buffer);
                 tQuestRewardHistory = new PlayerQuestRewardHistoryEntry[buffer.ReadUInt(7)];
@@ -36,6 +38,7 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Fields
                 buffer.WriteInt(32, LastPlayedAct);
                 buffer.WriteInt(32, HighestUnlockedAct);
                 buffer.WriteInt(32, PlayedFlags);
+                buffer.WriteInt(32, Field3);
                 PlayerSavedData.Encode(buffer);
                 buffer.WriteInt(7, tQuestRewardHistory.Length);
                 for (int i = 0; i < tQuestRewardHistory.Length; i++)
@@ -57,7 +60,7 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Fields
                 b.Append(' ', pad);
                 b.AppendLine("PlayedFlags: 0x" + PlayedFlags.ToString("X8") + " (" + PlayedFlags + ")");
                 b.Append(' ', pad);
-                //b.AppendLine("Field3: 0x" + Field3.ToString("X8") + " (" + Field3 + ")");
+                b.AppendLine("Field3: 0x" + Field3.ToString("X8") + " (" + Field3 + ")");
                 b.Append(' ', pad);
                 //b.AppendLine("PlayerFlags: 0x" + PlayerFlags.ToString("X8") + " (" + PlayerFlags + ")");
                 PlayerSavedData.AsText(b, pad);

@@ -176,12 +176,12 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Definitions.Misc
             buffer.WriteBool(Action.HasValue);
             if (Action.HasValue)
             {
-                buffer.WriteInt(32, EngagedWithGoblinTime.Value);
+                buffer.WriteInt(32, Action.Value);
             }
             buffer.WriteBool(EngagedWithRareTime.HasValue);
             if (EngagedWithRareTime.HasValue)
             {
-                buffer.WriteInt(32, EngagedWithGoblinTime.Value);
+                buffer.WriteInt(32, EngagedWithRareTime.Value);
             }
             buffer.WriteBool(EngagedWithGoblinTime.HasValue);
             if (EngagedWithGoblinTime.HasValue)
@@ -214,7 +214,7 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Definitions.Misc
                 buffer.WriteInt(32, gbidPortraitFrame.Value);
             }
             buffer.WriteBool(field23.HasValue);
-            if (InUberFight.HasValue)
+            if (field23.HasValue)
             {
                 buffer.WriteBool(field23.Value);
             }

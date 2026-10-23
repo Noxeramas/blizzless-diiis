@@ -23,6 +23,7 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Fields
         {
             for (UInt16 i = 0; i < 70; i++)
                 buffer.WriteInt(8, Field0[i]);
+            buffer.WriteInt(10, Field1.Length);
             for (int i = 0; i < Field1.Length; i++) buffer.WriteInt(32, Field1[i]);
         }
 

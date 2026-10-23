@@ -27,7 +27,8 @@ namespace DiIiS_NA.LoginServer.ServicesSystem
 
     public static class Service
     {
-        private static uint _notImplementedServiceCounter = 99;
+        // Returned for hashes no service handles; must not collide with any real service ID.
+        private const uint UnknownServiceId = uint.MaxValue;
         private readonly static Dictionary<Type, ServiceAttribute> ProvidedServices = new();
         private readonly static Dictionary<Type, IService> Services = new();
 
@@ -56,7 +57,7 @@ namespace DiIiS_NA.LoginServer.ServicesSystem
                 return serviceInfo.ServiceID;
             }
 
-            return _notImplementedServiceCounter++;
+            return UnknownServiceId;
         }
     }
 }

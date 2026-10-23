@@ -819,9 +819,9 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 							hireling.SetUpAttributes(joinedPlayer);
 							hireling.GBHandle.Type = 4;
 
-							hireling.Attributes[GameAttribute.Pet_Creator] = joinedPlayer.PlayerIndex;
+							hireling.Attributes[GameAttribute.Pet_Creator] = joinedPlayer.PlayerIndex + 1;
 							hireling.Attributes[GameAttribute.Pet_Type] = 0;
-							hireling.Attributes[GameAttribute.Pet_Owner] = joinedPlayer.PlayerIndex;
+							hireling.Attributes[GameAttribute.Pet_Owner] = joinedPlayer.PlayerIndex + 1;
 							hireling.Attributes[GameAttribute.Untargetable] = false;
 							hireling.Attributes[GameAttribute.NPC_Is_Escorting] = true;
 

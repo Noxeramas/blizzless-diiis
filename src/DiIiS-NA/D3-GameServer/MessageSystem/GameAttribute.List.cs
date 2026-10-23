@@ -46,7 +46,7 @@ namespace DiIiS_NA.GameServer.MessageSystem
         public static readonly GameAttributeF Dexterity_Reduction_Percent = new(27, "Dexterity_Reduction_Percent", encodingType: GameAttributeEncoding.Float16, bitCount: 16);
         public static readonly GameAttributeF Intelligence_Reduction_Percent = new(28, "Intelligence_Reduction_Percent", encodingType: GameAttributeEncoding.Float16, bitCount: 16);
         public static readonly GameAttributeF Vitality_Reduction_Percent = new(29, "Vitality_Reduction_Percent", encodingType: GameAttributeEncoding.Float16, bitCount: 16);
-        public static readonly GameAttributeI Primary_Damage_Attribute = new(30, "Primary_Damage_Attribute", defaultValue: -1, min: -1, max: 3, bitCount: 3);
+        public static readonly GameAttributeI Primary_Damage_Attribute = new(30, "Primary_Damage_Attribute", defaultValue: 0, min: -1, max: 3, bitCount: 3, storesRawValue: true);
         public static readonly GameAttributeF Armor = new(31, "Armor", flags: ReplicationFlags.PlayerReplicated2 | ReplicationFlags.ItemReplicated);
         public static readonly GameAttributeF Armor_Bonus_Percent = new(32, "Armor_Bonus_Percent", flags: ReplicationFlags.PlayerReplicated2 | ReplicationFlags.ItemReplicated);
         public static readonly GameAttributeF Armor_Item = new(33, "Armor_Item", flags: ReplicationFlags.PlayerReplicated2 | ReplicationFlags.ItemReplicated);
@@ -164,8 +164,8 @@ namespace DiIiS_NA.GameServer.MessageSystem
         public static readonly GameAttributeF Healing_Received_Queued_Tick = new(145, "Healing_Received_Queued_Tick");
         public static readonly GameAttributeF Staggered_Damage_Fraction = new(146, "Staggered_Damage_Fraction");
         public static readonly GameAttributeF Staggered_Damage_Duration = new(147, "Staggered_Damage_Duration");
-        public static readonly GameAttributeI Resource_Type_Primary = new(148, "Resource_Type_Primary", defaultValue: -1, min: -1, max: 9, u4: 3, u5: 1, flags: ReplicationFlags.PlayerReplicated2, bitCount: 4);
-        public static readonly GameAttributeI Resource_Type_Secondary = new(149, "Resource_Type_Secondary", defaultValue: -1, min: -1, max: 9, u4: 3, u5: 1, flags: ReplicationFlags.PlayerReplicated2, bitCount: 4);
+        public static readonly GameAttributeI Resource_Type_Primary = new(148, "Resource_Type_Primary", defaultValue: 0, min: -1, max: 9, u4: 3, u5: 1, flags: ReplicationFlags.PlayerReplicated2, bitCount: 4, storesRawValue: true);
+        public static readonly GameAttributeI Resource_Type_Secondary = new(149, "Resource_Type_Secondary", defaultValue: 0, min: -1, max: 9, u4: 3, u5: 1, flags: ReplicationFlags.PlayerReplicated2, bitCount: 4, storesRawValue: true);
         public static readonly GameAttributeF Resource_Cur = new(150, "Resource_Cur", u3: 10, script: "Max(Resource_Cur.Agg, 0)", flags: ReplicationFlags.PlayerReplicated2);
         public static readonly GameAttributeF Resource_Max = new(151, "Resource_Max", encodingType: GameAttributeEncoding.Float16Or32, u3: 10, flags: ReplicationFlags.PlayerReplicated2, bitCount: 0);
         public static readonly GameAttributeF Resource_Max_Bonus = new(152, "Resource_Max_Bonus", encodingType: GameAttributeEncoding.Float16Or32, u3: 10, flags: (ReplicationFlags)222, bitCount: 0); // FIXME: incorrect flags
@@ -227,7 +227,7 @@ namespace DiIiS_NA.GameServer.MessageSystem
         public static readonly GameAttributeF Power_Cooldown_Min_Time = new(208, "Power_Cooldown_Min_Time", encodingType: GameAttributeEncoding.Float16Or32, flags: ReplicationFlags.PlayerReplicated2 | ReplicationFlags.ItemReplicated, bitCount: 0);
         public static readonly GameAttributeF Power_Cooldown_Reduction_Percent = new(209, "Power_Cooldown_Reduction_Percent", encodingType: GameAttributeEncoding.Float16, bitCount: 16);
         public static readonly GameAttributeF Power_Cooldown_Reduction_Percent_All = new(210, "Power_Cooldown_Reduction_Percent_All", encodingType: GameAttributeEncoding.Float16, bitCount: 16);
-        public static readonly GameAttributeF Power_Cooldown_Reduction_Percent_All_Capped = new(211, "Power_Cooldown_Reduction_Percent_All_Capped", encodingType: GameAttributeEncoding.Float16, script: "Power_Cooldown_Reduction_Percent_All", bitCount: 16);
+        public static readonly GameAttributeF Power_Cooldown_Reduction_Percent_All_Capped = new(211, "Power_Cooldown_Reduction_Percent_All_Capped", script: "Power_Cooldown_Reduction_Percent_All"); // Float32 since 2.8.0 (was Float16)
         public static readonly GameAttributeF Damage_Delta = new(212, "Damage_Delta", encodingType: GameAttributeEncoding.Float16Or32, bitCount: 0);
         public static readonly GameAttributeF Damage_Delta_Total = new(213, "Damage_Delta_Total", script: "Max(Damage_Delta-Damage_Bonus_Min + Damage_Weapon_Delta_Total_CurrentHand, 0)");
         public static readonly GameAttributeF Damage_Min = new(214, "Damage_Min");
@@ -494,9 +494,9 @@ namespace DiIiS_NA.GameServer.MessageSystem
         public static readonly GameAttributeB Gizmo_Has_Been_Operated = new(475, "Gizmo_Has_Been_Operated", u4: 1, u5: 1, flags: ReplicationFlags.GizmoReplicated);
         public static readonly GameAttributeB Banner_Usable = new(476, "Banner_Usable");
         public static readonly GameAttributeB Banner_Player_In_Combat = new(477, "Banner_Player_In_Combat");
-        public static readonly GameAttributeI Pet_Owner = new(478, "Pet_Owner", defaultValue: -1, min: -1, max: 8, flags: (ReplicationFlags)222, bitCount: 4); // FIXME: incorrect flags
-        public static readonly GameAttributeI Pet_Creator = new(479, "Pet_Creator", defaultValue: -1, min: -1, max: 8, flags: (ReplicationFlags)222, bitCount: 4); // FIXME: incorrect flags
-        public static readonly GameAttributeI Pet_Type = new(480, "Pet_Type", defaultValue: -1, min: -1, max: 77, flags: (ReplicationFlags)222, bitCount: 7);
+        public static readonly GameAttributeI Pet_Owner = new(478, "Pet_Owner", defaultValue: 0, min: -1, max: 8, flags: (ReplicationFlags)222, bitCount: 4, storesRawValue: true); // FIXME: incorrect flags
+        public static readonly GameAttributeI Pet_Creator = new(479, "Pet_Creator", defaultValue: 0, min: -1, max: 8, flags: (ReplicationFlags)222, bitCount: 4, storesRawValue: true); // FIXME: incorrect flags
+        public static readonly GameAttributeI Pet_Type = new(480, "Pet_Type", defaultValue: 0, min: -1, max: 77, flags: (ReplicationFlags)222, bitCount: 7, storesRawValue: true);
         public static readonly GameAttributeB DropsNoLoot = new(481, "DropsNoLoot");
         public static readonly GameAttributeB GrantsNoXP = new(482, "GrantsNoXP");
         public static readonly GameAttributeI Hireling_Class = new(483, "Hireling_Class", max: 4, flags: (ReplicationFlags)222, bitCount: 3); // FIXME: incorrect flags
@@ -507,8 +507,8 @@ namespace DiIiS_NA.GameServer.MessageSystem
         public static readonly GameAttributeB NPC_Is_Operatable = new(488, "NPC_Is_Operatable", u4: 1, u5: 1, flags: (ReplicationFlags)222); // FIXME: incorrect flags
         public static readonly GameAttributeB NPC_Is_Escorting = new(489, "NPC_Is_Escorting", u4: 1, u5: 1, flags: (ReplicationFlags)222); // FIXME: incorrect flags
         public static readonly GameAttributeB NPC_Has_Interact_Options = new(490, "NPC_Has_Interact_Options, u3: 12, u4: 1, u5: 1", flags: (ReplicationFlags)222); // FIXME: incorrect flags
-        public static readonly GameAttributeI Conversation_Icon = new(491, "Conversation_Icon", defaultValue: -1, min: -1, max: 6, flags: (ReplicationFlags)222, bitCount: 3); // FIXME: incorrect flags
-        public static readonly GameAttributeI Conversation_Icon_Override = new(492, "Conversation_Icon_Override", defaultValue: -1, min: -1, max: 6, flags: (ReplicationFlags)222, bitCount: 3); // FIXME: incorrect flags
+        public static readonly GameAttributeI Conversation_Icon = new(491, "Conversation_Icon", defaultValue: 0, min: -1, max: 6, flags: (ReplicationFlags)222, bitCount: 3, storesRawValue: true); // FIXME: incorrect flags
+        public static readonly GameAttributeI Conversation_Icon_Override = new(492, "Conversation_Icon_Override", defaultValue: 0, min: -1, max: 6, flags: (ReplicationFlags)222, bitCount: 3, storesRawValue: true); // FIXME: incorrect flags
         public static readonly GameAttributeF Callout_Cooldown = new(493, "Callout_Cooldown", defaultValue: -1);
         public static readonly GameAttributeF Banter_Cooldown = new(494, "Banter_Cooldown", defaultValue: -1);
         public static readonly GameAttributeF Conversation_Heard_Count = new(495, "Conversation_Heard_Count");
@@ -1498,7 +1498,7 @@ namespace DiIiS_NA.GameServer.MessageSystem
         public static readonly GameAttributeB Item_was_sanctified = new(1479, "Itemwassanctified");
         public static readonly GameAttributeB Sanctified_items_unlocked = new(1480, "Sanctifieditemsunlocked");
         public static readonly GameAttributeI Heros_Unlocked_Dark_Alchemy_Nodes = new(1481, "HerosunlockedDarkAlchemynodes");
-        public static readonly GameAttributeI Dark_Alchemy_Powers_Unlocked = new(1482, "DarkAlchemypowersunlocked");
+        public static readonly GameAttributeI Dark_Alchemy_Powers_Unlocked = new(1482, "DarkAlchemypowersunlocked", max: 1, bitCount: 1); // bounded 0..1 in 2.8.0
         public static readonly GameAttributeB Item_Was_Primalized = new(1483, "Itemwasprimalized");
         #endregion
     }

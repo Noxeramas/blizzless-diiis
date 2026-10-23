@@ -131,8 +131,13 @@ namespace DiIiS_NA.GameServer.MessageSystem
         public override GameAttributeValue MinAttributeValue => new(Min);
 		public override GameAttributeValue MaxAttributeValue => new(Max);
 
-        public GameAttributeI(int id, string name, GameAttributeEncoding encodingType = GameAttributeEncoding.Int, int defaultValue = 0, int min = 0, int max = 0, int u3 = -1, int u4 = 0, int u5 = 0, string script = "", ReplicationFlags flags = 0, int bitCount = 32)
-			: base(id, name, encodingType, defaultValue, min, max, u3, u4, u5, script, flags, bitCount) { 
+        // The client reads every integer attribute narrower than 32 bits as a bounded int (value - min), so an
+        // Int declared with fewer bits is encoded that way too, or ranges starting below 0 break.
+        // storesRawValue: the server code already stores this attribute shifted by -min (e.g. Resource_Type
+        // is set to resource + 1), so it is sent unchanged instead.
+        public GameAttributeI(int id, string name, GameAttributeEncoding encodingType = GameAttributeEncoding.Int, int defaultValue = 0, int min = 0, int max = 0, int u3 = -1, int u4 = 0, int u5 = 0, string script = "", ReplicationFlags flags = 0, int bitCount = 32, bool storesRawValue = false)
+			: base(id, name, encodingType == GameAttributeEncoding.Int && bitCount < 32 && !storesRawValue ? GameAttributeEncoding.IntMinMax : encodingType,
+				defaultValue, min, max, u3, u4, u5, script, flags, bitCount) {
 		}
     }
 

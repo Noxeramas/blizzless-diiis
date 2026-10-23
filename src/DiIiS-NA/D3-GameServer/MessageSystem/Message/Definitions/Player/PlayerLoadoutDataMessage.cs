@@ -15,7 +15,7 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Definitions.Player
         public LoadoutPotionData EqippedPotion;
         public LoadoutSkillData[] ActiveSkills = new LoadoutSkillData[6];
         public int[] /* sno */ SnoTraits = new int[4];
-        public int[] /* gbid */ GbidLegendaryPowers = new int[5];
+        public int[] /* gbid */ GbidLegendaryPowers = new int[4]; // 2.8.0 has 4 (808-byte message)
         public string Name;
         public int TabIcon;
 

@@ -18,7 +18,7 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Definitions.Player
 
         public override void Parse(GameBitBuffer buffer)
         {
-            Field0 = (eField0)buffer.ReadInt(32);
+            Field0 = (eField0)(buffer.ReadInt(12) + (-1)); // 12-bit act, range -1..3000
             Field1 = buffer.ReadInt(32);
             Field2 = buffer.ReadInt(32);
             Field3 = buffer.ReadInt(32);
@@ -29,7 +29,7 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Definitions.Player
 
         public override void Encode(GameBitBuffer buffer)
         {
-            buffer.WriteInt(32, (int)Field0);
+            buffer.WriteInt(12, (int)Field0 - (-1)); // 12-bit act, range -1..3000
             buffer.WriteInt(32, Field1);
             buffer.WriteInt(32, Field2);
             buffer.WriteInt(32, Field3);

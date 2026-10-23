@@ -6052,8 +6052,8 @@ public class Player : Actor, IMessageConsumer, IUpdateable
         minion.Attributes[GameAttributes.Invulnerable] = true;
         minion.Attributes[GameAttributes.TeamID] = 2;
         minion.Attributes[GameAttributes.NPC_Is_Escorting] = true;
-        minion.Attributes[GameAttributes.Pet_Creator] = 1;
-        minion.Attributes[GameAttributes.Pet_Owner] = 1;
+        minion.Attributes[GameAttributes.Pet_Creator] = PlayerIndex + 1;
+        minion.Attributes[GameAttributes.Pet_Owner] = PlayerIndex + 1;
         minion.Attributes[GameAttributes.Pet_Type] = 25;
 
         //*/
