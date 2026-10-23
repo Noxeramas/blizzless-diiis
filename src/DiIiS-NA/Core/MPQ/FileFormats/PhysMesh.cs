@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using Gibbed.IO;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
@@ -17,7 +18,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         //public string S0 { get; private set; }
         //public string S1 { get; private set; }
 
-        public PhysMesh(MpqFile file)
+        public PhysMesh(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream); //0
@@ -48,7 +49,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I6 { get; private set; }
         public int I7 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             //64
             stream.Position += (4 * 6);
@@ -80,7 +81,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public Float4() { }
 
-        public Float4(MpqFileStream stream)
+        public Float4(Stream stream)
         {
             X = stream.ReadValueF32();
             Y = stream.ReadValueF32();
@@ -88,7 +89,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             K = stream.ReadValueF32();
         }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             X = stream.ReadValueF32();
             Y = stream.ReadValueF32();
@@ -105,14 +106,14 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public Float3() { }
 
-        public Float3(MpqFileStream stream)
+        public Float3(Stream stream)
         {
             X = stream.ReadValueF32();
             Y = stream.ReadValueF32();
             Z = stream.ReadValueF32();
         }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             X = stream.ReadValueF32();
             Y = stream.ReadValueF32();
@@ -133,7 +134,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public short I6 { get; private set; }
         public short I7 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             VerticeOneIndex = stream.ReadValueS32();
             VerticeTwoIndex = stream.ReadValueS32();
@@ -158,7 +159,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I3 { get; private set; }
         public int I4 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             I0 = stream.ReadValueS32();
             I1 = stream.ReadValueS32();
@@ -181,7 +182,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public int I0 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             B0 = stream.ReadValueS16();
             B1 = stream.ReadValueS16();

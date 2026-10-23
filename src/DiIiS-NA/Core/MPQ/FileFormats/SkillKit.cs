@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using CrystalMpq;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.SNO;
@@ -13,7 +14,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public List<TraitEntry> TraitEntries { get; private set; }
         public List<ActiveSkillEntry> ActiveSkillEntries { get; private set; }
 
-        public SkillKit(MpqFile file)
+        public SkillKit(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);
@@ -32,7 +33,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int Category { get; private set; }
         public int ReqLevel { get; private set; }
         public int I0 { get; private set; }
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             SNOPower = stream.ReadValueS32();
             Category = stream.ReadValueS32();
@@ -56,7 +57,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I0 { get; private set; }
         public int[] I1 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             SNOPower = stream.ReadValueS32();
             Category = (ActiveSkillCategory)stream.ReadValueS32();

@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using Gibbed.IO;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 using DiIiS_NA.GameServer.Core.Types.Math;
@@ -54,7 +55,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
           END - TypeDescriptorField::TypeDescriptorField( (TypeDescriptorField *)&RopeDefinition_Fields[38], 0LL, DT_NULL, 1120, 0LL, 0);
         //*/
 
-        public Rope(MpqFile file)
+        public Rope(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);

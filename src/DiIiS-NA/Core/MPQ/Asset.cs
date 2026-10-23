@@ -13,13 +13,14 @@ namespace DiIiS_NA.Core.MPQ
         public Type Parser { get; set; }
 
         protected FileFormat _data = null;
+        private bool _parseFailed;
         protected static readonly Logger Logger = LogManager.CreateLogger("A");
 
         public FileFormat Data
         {
             get
             {
-                if (_data == null && SourceAvailable && Parser != null)
+                if (_data == null && !_parseFailed && SourceAvailable && Parser != null)
                 {
                     try
                     {
@@ -27,6 +28,7 @@ namespace DiIiS_NA.Core.MPQ
                     }
                     catch (Exception e)
                     {
+                        _parseFailed = true; // a bad asset fails the same way every time; don't re-parse it on each access
                         Logger.FatalException(e, "Bad MPQ detected, failed parsing asset: {0}", this.FileName);
                     }
                 }

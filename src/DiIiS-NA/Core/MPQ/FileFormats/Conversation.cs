@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using CrystalMpq;
 using Gibbed.IO;
@@ -29,9 +30,9 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int SNOBossEncounter { get; private set; }
         public int Pad { get; private set; }
 
-        public Conversation(MpqFile file)
+        public Conversation(IAssetFile file)
         {
-            MpqFileStream stream = file.Open();
+            Stream stream = file.Open();
 
             Header = new Header(stream); //0
             //+16
@@ -114,7 +115,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public List<ConversationTreeNode> FalseNodes { get; private set; }
         public List<ConversationTreeNode> ChildNodes { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             //288
             ConvNodeType = stream.ReadValueS32();
@@ -196,7 +197,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
     {
         public int[] Languages = new int[14];
 
-        public ConvLocalDisplayTimes(MpqFileStream stream)
+        public ConvLocalDisplayTimes(Stream stream)
         {
             for (int i = 0; i < Languages.Length; i++)
                 Languages[i] = stream.ReadValueS32();

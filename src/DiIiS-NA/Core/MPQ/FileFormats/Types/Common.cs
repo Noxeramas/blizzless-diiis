@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.Core.Storage;
 using DiIiS_NA.GameServer.Core.Types.Misc;
 using DiIiS_NA.GameServer.Core.Types.SNO;
@@ -17,7 +18,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats.Types
         public int Unknown4 { get; private set; }
         public int SNOId { get; private set; }
 
-        public Header(MpqFileStream stream)
+        public Header(Stream stream)
         {
             DeadBeef = stream.ReadValueS32();
             SnoType = stream.ReadValueS32();
@@ -63,7 +64,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats.Types
 
         public ScriptFormula() { }
 
-        public ScriptFormula(MpqFileStream stream)
+        public ScriptFormula(Stream stream)
         {
             I0 = stream.ReadValueS32();
             I1 = stream.ReadValueS32();
@@ -91,7 +92,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats.Types
 
             }
             OpCodeArray = new byte[OpcodeSize];
-            stream.Read(OpCodeArray, 0, OpcodeSize);
+            stream.ReadExactly(OpCodeArray, 0, OpcodeSize);
         }
 
         public override string ToString()
@@ -107,7 +108,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats.Types
         public int I0 { get; private set; }
         public int I1 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             CharArray1 = stream.ReadString(256, true);
             CharArray2 = stream.ReadString(512, true);
@@ -122,7 +123,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats.Types
         public string Name { get; private set; }
         public int I0 { get; private set; }
 
-        public HardPointLink(MpqFileStream stream)
+        public HardPointLink(Stream stream)
         {
             Name = stream.ReadString(64, true);
             I0 = stream.ReadValueS32();
@@ -162,7 +163,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats.Types
         public eMaterial Material { get; private set; }
         public int ConditionFlags { get; private set; }
 
-        public TriggerConditions(MpqFileStream stream)
+        public TriggerConditions(Stream stream)
         {
             Percent = stream.ReadByte();
             stream.Position += 3;
@@ -257,7 +258,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats.Types
         public RGBAColor ColorMul { get; private set; }
         public int HitFlashMulDuration { get; private set; } // DT_TIME
 
-        public TriggerEvent(MpqFileStream stream)
+        public TriggerEvent(Stream stream)
         {
             eType = (TriggeredEventType)stream.ReadValueS32();
             TriggerConditions = new TriggerConditions(stream);
@@ -299,7 +300,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats.Types
         public int I0 { get; private set; }
         public TriggerEvent TriggerEvent { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             I0 = stream.ReadValueS32();
             TriggerEvent = new TriggerEvent(stream);
@@ -331,7 +332,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats.Types
 
         public ItemSpecifierData() { }
 
-        public ItemSpecifierData(MpqFileStream stream)
+        public ItemSpecifierData(Stream stream)
         {
             ItemGBId = stream.ReadValueS32();
             NumAffixes = stream.ReadValueS32();

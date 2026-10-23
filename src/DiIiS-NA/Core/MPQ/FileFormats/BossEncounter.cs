@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 using Gibbed.IO;
@@ -28,7 +29,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int LevelAreaSNO { get; private set; }
         public int ActorSNO { get; private set; }
 
-        public BossEncounter(MpqFile file)
+        public BossEncounter(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);

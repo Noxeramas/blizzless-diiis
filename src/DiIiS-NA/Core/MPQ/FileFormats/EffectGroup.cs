@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using CrystalMpq;
 using Gibbed.IO;
 using DiIiS_NA.GameServer.Core.Types.SNO;
@@ -20,7 +21,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int[] I5 { get; private set; }
         public List<EffectItem> EffectItems = new List<EffectItem>();
 
-        public EffectGroup(MpqFile file)
+        public EffectGroup(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);
@@ -46,7 +47,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public string Hash { get; private set; } // 64
         public MsgTriggeredEvent TriggeredEvent = new MsgTriggeredEvent();
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             Weight = stream.ReadValueS32();
             Hash = stream.ReadString(64, true);

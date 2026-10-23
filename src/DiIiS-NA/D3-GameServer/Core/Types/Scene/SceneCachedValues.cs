@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.IO;
 using CrystalMpq;
 using DiIiS_NA.Core.Storage;
 using DiIiS_NA.GameServer.Core.Types.Collision;
@@ -40,7 +41,7 @@ namespace DiIiS_NA.GameServer.Core.Types.Scene
 		/// Reads SceneCachedValues from given MPQFileStream.
 		/// </summary>
 		/// <param name="stream">The MPQFileStream to read from.</param>
-		public SceneCachedValues(MpqFileStream stream)
+		public SceneCachedValues(Stream stream)
 		{
 			CachedValuesValid = stream.ReadValueS32();
 			NavMeshSizeX = stream.ReadValueS32();

@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using Gibbed.IO;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 using DiIiS_NA.GameServer.Core.Types.Math;
@@ -34,7 +35,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public float F6 { get; private set; }
         public float F7 { get; private set; }
 
-        public Observer(MpqFile file)
+        public Observer(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);

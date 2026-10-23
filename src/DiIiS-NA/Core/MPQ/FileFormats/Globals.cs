@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using CrystalMpq;
 using Gibbed.IO;
 using DiIiS_NA.GameServer.Core.Types.SNO;
@@ -123,7 +124,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public int I21 { get; private set; }
 
-        public Globals(MpqFile file)
+        public Globals(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);
@@ -187,7 +188,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public float F8 { get; private set; }
         public float F9 { get; private set; }
 
-        public DifficultyTuningParams(MpqFileStream stream)
+        public DifficultyTuningParams(Stream stream)
         {
             F0 = stream.ReadValueF32();
             F1 = stream.ReadValueF32();
@@ -207,7 +208,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int UHash { get; private set; }
         public string S0 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             UHash = stream.ReadValueS32();
             S0 = stream.ReadString(64, true);
@@ -219,7 +220,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I0 { get; private set; }
         public string S0 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             I0 = stream.ReadValueS32();
             S0 = stream.ReadString(64, true);
@@ -232,7 +233,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public string S0 { get; private set; }
         public float F0 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             UHash = stream.ReadValueS32();
             S0 = stream.ReadString(32, true);
@@ -386,7 +387,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I41 { get; private set; }
         public int I42 { get; private set; }
         public float F65 { get; private set; }
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             ActorGroups = new Dictionary<int, ActorGroup>();
             foreach (var group in stream.ReadSerializedData<ActorGroup>()) //166
@@ -450,7 +451,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public List<int> SNOActorRibbons { get; private set; }
         public List<EpicBannerDescription> EpicBannerDescriptions { get; private set; }
 
-        public BannerParams(MpqFileStream stream)
+        public BannerParams(Stream stream)
         {
             stream.Position += 8;
             TexBackgrounds = stream.ReadSerializedData<BannerTexturePair>();
@@ -489,7 +490,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int SNOTexture { get; private set; }
         public int I0 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             SNOTexture = stream.ReadValueS32();
             I0 = stream.ReadValueS32();
@@ -504,7 +505,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I0 { get; private set; }
         public int I1 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             Color = new RGBAColor[2];
             for (int i = 0; i < 2; i++)
@@ -521,7 +522,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public string S0 { get; private set; }
         public int I0 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             S0 = stream.ReadString(64, true);
             I0 = stream.ReadValueS32();
@@ -536,7 +537,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I3 { get; private set; }
         public string S0 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             SNOBannerShape = stream.ReadValueS32();
             SNOBannerBase = stream.ReadValueS32();
@@ -551,7 +552,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I0 { get; private set; }
         public int I1 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             I0 = stream.ReadValueS32();
             I1 = stream.ReadValueS32();

@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 using Gibbed.IO;
 using System.Collections.Generic;
@@ -59,7 +60,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             return defaultAnimations;
         }
 
-        public AnimSet(MpqFile file)
+        public AnimSet(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);

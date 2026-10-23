@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.IO;
 using CrystalMpq;
 using DiIiS_NA.Core.Storage;
 using DiIiS_NA.GameServer.MessageSystem;
@@ -23,7 +24,7 @@ namespace DiIiS_NA.GameServer.Core.Types.Math
 		/// Reads PRTransform from given MPQFileStream.
 		/// </summary>
 		/// <param name="stream">The MPQFileStream to read from.</param>
-		public PRTransform(MpqFileStream stream)
+		public PRTransform(Stream stream)
 		{
 			Quaternion = new Quaternion(stream);
 			Vector3D = new Vector3D(stream);

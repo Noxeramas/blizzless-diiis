@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 using Gibbed.IO;
@@ -22,7 +23,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public float F3 { get; private set; }
         public float F4 { get; private set; }
 
-        public AmbientSound(MpqFile file)
+        public AmbientSound(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);
@@ -52,7 +53,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public float Time01 { get; private set; }
         public float Time02 { get; private set; }
 
-        public RandomAmbientSoundParams(MpqFileStream stream)
+        public RandomAmbientSoundParams(Stream stream)
         {
             SNO = stream.ReadValueS32();
             F0 = stream.ReadValueF32();

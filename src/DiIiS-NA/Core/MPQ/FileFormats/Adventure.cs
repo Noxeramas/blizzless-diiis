@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 using Gibbed.IO;
@@ -16,7 +17,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public float Angle2 { get; private set; }
         public int MarkerSetSNO { get; private set; }
 
-        public Adventure(MpqFile file)
+        public Adventure(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);

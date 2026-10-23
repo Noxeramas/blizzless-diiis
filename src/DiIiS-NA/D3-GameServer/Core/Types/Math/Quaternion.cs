@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.IO;
 using CrystalMpq;
 using DiIiS_NA.GameServer.MessageSystem;
 using Gibbed.IO;
@@ -38,7 +39,7 @@ namespace DiIiS_NA.GameServer.Core.Types.Math
 		/// Reads Quaternion from given MPQFileStream.
 		/// </summary>
 		/// <param name="stream">The MPQFileStream to read from.</param>
-		public Quaternion(MpqFileStream stream)
+		public Quaternion(Stream stream)
 		{
 			Vector3D = new Vector3D(stream.ReadValueF32(), stream.ReadValueF32(), stream.ReadValueF32());
 			W = stream.ReadValueF32();

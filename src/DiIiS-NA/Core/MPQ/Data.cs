@@ -26,8 +26,27 @@ namespace DiIiS_NA.Core.MPQ
             FileName = fileName;
         }
     }
-    public class Data : MPQPatchChain
+    public class Data
     {
+        /// <summary>The bundled MPQ archives, used when no installed game is available.</summary>
+        private sealed class CoreMpqChain : MPQPatchChain
+        {
+            public CoreMpqChain()
+                //: base(0, new List<string> { "CoreData.mpq", "ClientData.mpq" }, "/base/d3-update-base-(?<version>.*?).mpq")
+                : base(0, new List<string> { "Core.mpq", "Core1.mpq", "Core2.mpq", "Core3.mpq", "Core4.mpq" },
+                    "/base/d3-update-base-(?<version>.*?).mpq")
+            {
+            }
+        }
+
+        private readonly CoreMpqChain _mpq;
+        private readonly CascStorage _casc;
+        // SNO id and name of every asset in the installed game's CoreTOC.dat, by group (CASC only).
+        private readonly Dictionary<SNOGroup, List<(int SnoId, string Name)>> _toc;
+
+        public bool Loaded { get; }
+        public string Source { get; }
+
         public Dictionary<SNOGroup, ConcurrentDictionary<int, Asset>> Assets = new Dictionary<SNOGroup, ConcurrentDictionary<int, Asset>>();
         public readonly Dictionary<SNOGroup, Type> Parsers = new Dictionary<SNOGroup, Type>();
         private readonly List<Task> _tasks = new List<Task>();
@@ -67,14 +86,30 @@ namespace DiIiS_NA.Core.MPQ
         #endregion
 
 
-        private new static readonly Logger Logger = LogManager.CreateLogger("MPQWorker");
+        private static readonly Logger Logger = LogManager.CreateLogger("MPQWorker");
 
+        /// <summary>Game data from the bundled MPQ archives.</summary>
         public Data()
-            //: base(0, new List<string> { "CoreData.mpq", "ClientData.mpq" }, "/base/d3-update-base-(?<version>.*?).mpq")
-            : base(0, new List<string> { "Core.mpq", "Core1.mpq", "Core2.mpq", "Core3.mpq", "Core4.mpq" },
-                "/base/d3-update-base-(?<version>.*?).mpq")
         {
-            
+            _mpq = new CoreMpqChain();
+            Loaded = _mpq.Loaded;
+            Source = "bundled MPQ archives";
+        }
+
+        /// <summary>Game data from an installed game's CASC storage.</summary>
+        public Data(CascStorage casc)
+        {
+            _casc = casc;
+            _toc = new Dictionary<SNOGroup, List<(int, string)>>();
+            foreach (var (group, snoId, name) in casc.ReadCoreToc())
+            {
+                if (!_toc.TryGetValue((SNOGroup)group, out var entries))
+                    _toc[(SNOGroup)group] = entries = new List<(int, string)>();
+                entries.Add((snoId, name));
+            }
+            Loaded = true;
+            Source = $"{casc.GameDirectory} ({casc.FileCount} files)";
+            GameDataFormat.IsInstalledGame = true;
         }
 
         public void Init()
@@ -251,6 +286,16 @@ namespace DiIiS_NA.Core.MPQ
         }
         private void LoadSNODict(Dictionary<string, int> DictSNO, SNOGroup group)
         {
+            if (_toc != null)
+            {
+                // The installed game's table of contents is authoritative: the same ids as the built-in
+                // lists, plus everything added since.
+                DictSNO.Clear();
+                if (_toc.TryGetValue(group, out var entries))
+                    foreach (var (snoId, name) in entries)
+                        DictSNO[name] = snoId;
+            }
+
             foreach (var point in DictSNO)
             {
                 var asset = new MPQAsset(group, point.Value, point.Key);
@@ -361,15 +406,18 @@ namespace DiIiS_NA.Core.MPQ
             this._tasks.Add(new Task(() => asset.RunParser()));
         }
 
-        private MpqFile GetFile(string fileName, bool startSearchingFromBaseMPQ = false)
+        private IAssetFile GetFile(string fileName, bool startSearchingFromBaseMPQ = false)
         {
+            if (_casc != null)
+                return _casc.GetFile(@"Base\" + fileName);
+
             MpqFile file = null;
 
             if (!startSearchingFromBaseMPQ)
-                file = this.FileSystem.FindFile(fileName);
+                file = _mpq.FileSystem.FindFile(fileName);
             else
             {
-                foreach (MpqArchive archive in this.FileSystem.Archives.Reverse()) //search mpqs starting from base
+                foreach (MpqArchive archive in _mpq.FileSystem.Archives.Reverse()) //search mpqs starting from base
                 {
                     file = archive.FindFile(fileName);
                     if (file != null)
@@ -377,7 +425,7 @@ namespace DiIiS_NA.Core.MPQ
                 }
             }
 
-            return file;
+            return file == null ? null : new MpqAssetFile(file);
         }
     }
 }

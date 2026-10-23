@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using Gibbed.IO;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
@@ -23,7 +24,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public string CompiledScript { get; private set; }
 
-        public Power(MpqFile file)
+        public Power(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);
@@ -67,7 +68,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public ActorCollisionFlags ActColFlags2 { get; private set; }
         public List<BuffDef> Buffs = new List<BuffDef>(); //32
 
-        public PowerDef(MpqFileStream stream)
+        public PowerDef(Stream stream)
         {
             TagMap = stream.ReadSerializedItem<TagMap>();
             stream.Position += (2 * 4);
@@ -103,7 +104,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
     {
         public List<int> BuffFilterPowers = new List<int>();
 
-        public BuffDef(MpqFileStream stream)
+        public BuffDef(Stream stream)
         {
             BuffFilterPowers = stream.ReadSerializedInts();
         }

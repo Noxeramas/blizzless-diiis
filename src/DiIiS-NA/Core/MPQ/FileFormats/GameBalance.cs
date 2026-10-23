@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Collections.Generic;
 using CrystalMpq;
 using DiIiS_NA.Core.Helpers.Hash;
@@ -73,80 +74,80 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public List<TransmuteRecipesTable> TransmuteRecipesTables { get; private set; }
         public List<CurrencyConversionTable> CurrencyConversionTables { get; private set; }
         public GameBalance() { }
-        public GameBalance(MpqFile file)
+        public GameBalance(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);
             Type = (BalanceType)stream.ReadValueS32();
             I0 = stream.ReadValueS32();
             I1 = stream.ReadValueS32();
-            ItemType = stream.ReadSerializedData<ItemTypeTable>();
+            ItemType = stream.ReadSerializedData<ItemTypeTable>(GameDataFormat.RecordSize(336));
             stream.Position += 8;
-            Item = stream.ReadSerializedData<ItemTable>();
+            Item = stream.ReadSerializedData<ItemTable>(GameDataFormat.RecordSize(1408));
             stream.Position += 8;
-            Experience = stream.ReadSerializedData<ExperienceTable>();
+            Experience = stream.ReadSerializedData<ExperienceTable>(GameDataFormat.RecordSize(496));
             stream.Position += 8;
-            ExperienceAlt = stream.ReadSerializedData<ExperienceAltTable>();
+            ExperienceAlt = stream.ReadSerializedData<ExperienceAltTable>(GameDataFormat.RecordSize(128));
             stream.Position += 8;
-            HelpCodes = stream.ReadSerializedData<HelpCodesTable>();
+            HelpCodes = stream.ReadSerializedData<HelpCodesTable>(GameDataFormat.RecordSize(640));
             stream.Position += 8;
-            MonsterLevel = stream.ReadSerializedData<MonsterLevelTable>();
+            MonsterLevel = stream.ReadSerializedData<MonsterLevelTable>(GameDataFormat.RecordSize(240));
             stream.Position += 8;
-            Affixes = stream.ReadSerializedData<AffixTable>();
+            Affixes = stream.ReadSerializedData<AffixTable>(GameDataFormat.RecordSize(784));
             stream.Position += 8;
-            Heros = stream.ReadSerializedData<HeroTable>();
+            Heros = stream.ReadSerializedData<HeroTable>(GameDataFormat.RecordSize(504));
             stream.Position += 8;
-            MovementStyles = stream.ReadSerializedData<MovementStyle>();
+            MovementStyles = stream.ReadSerializedData<MovementStyle>(GameDataFormat.RecordSize(392));
             stream.Position += 8;
-            Labels = stream.ReadSerializedData<LabelGBIDTable>();
+            Labels = stream.ReadSerializedData<LabelGBIDTable>(GameDataFormat.RecordSize(272));
             stream.Position += 8;
-            LootDistribution = stream.ReadSerializedData<LootDistributionTableEntry>();
+            LootDistribution = stream.ReadSerializedData<LootDistributionTableEntry>(GameDataFormat.RecordSize(92));
             stream.Position += 8;
-            RareItemNames = stream.ReadSerializedData<RareItemNamesTable>();
+            RareItemNames = stream.ReadSerializedData<RareItemNamesTable>(GameDataFormat.RecordSize(280));
             stream.Position += 8;
-            MonsterAffixes = stream.ReadSerializedData<MonsterAffixesTable>();
+            MonsterAffixes = stream.ReadSerializedData<MonsterAffixesTable>(GameDataFormat.RecordSize(904));
             stream.Position += 8;
-            RareMonsterNames = stream.ReadSerializedData<MonsterNamesTable>();
+            RareMonsterNames = stream.ReadSerializedData<MonsterNamesTable>(GameDataFormat.RecordSize(400));
             stream.Position += 8;
-            SocketedEffects = stream.ReadSerializedData<SocketedEffectTable>();
+            SocketedEffects = stream.ReadSerializedData<SocketedEffectTable>(GameDataFormat.RecordSize(1416));
             stream.Position += 8;
-            ItemDropTable = stream.ReadSerializedData<ItemDropTableEntry>();
+            ItemDropTable = stream.ReadSerializedData<ItemDropTableEntry>(GameDataFormat.RecordSize(1144));
             stream.Position += 8;
-            ItemLevelModifiers = stream.ReadSerializedData<ItemLevelModifier>();
+            ItemLevelModifiers = stream.ReadSerializedData<ItemLevelModifier>(GameDataFormat.RecordSize(92));
             stream.Position += 8;
-            QualityClasses = stream.ReadSerializedData<QualityClass>();
+            QualityClasses = stream.ReadSerializedData<QualityClass>(GameDataFormat.RecordSize(360));
             stream.Position += 8;
-            HandicapLevelTables = stream.ReadSerializedData<HandicapLevelTable>();
+            HandicapLevelTables = stream.ReadSerializedData<HandicapLevelTable>(GameDataFormat.RecordSize(32));
             stream.Position += 8;
-            ItemSalvageLevelTables = stream.ReadSerializedData<ItemSalvageLevelTable>();
+            ItemSalvageLevelTables = stream.ReadSerializedData<ItemSalvageLevelTable>(GameDataFormat.RecordSize(16));
             stream.Position += 8;
-            Hirelings = stream.ReadSerializedData<HirelingTable>();
+            Hirelings = stream.ReadSerializedData<HirelingTable>(GameDataFormat.RecordSize(328));
             stream.Position += 8;
-            SetItemBonus = stream.ReadSerializedData<SetItemBonusTable>();
+            SetItemBonus = stream.ReadSerializedData<SetItemBonusTable>(GameDataFormat.RecordSize(464));
             stream.Position += 8;
-            EliteModifiers = stream.ReadSerializedData<EliteModifier>();
+            EliteModifiers = stream.ReadSerializedData<EliteModifier>(GameDataFormat.RecordSize(352));
             stream.Position += 8;
-            ItemTiers = stream.ReadSerializedData<ItemTier>();
+            ItemTiers = stream.ReadSerializedData<ItemTier>(GameDataFormat.RecordSize(32));
             stream.Position += 8;
-            PowerFormula = stream.ReadSerializedData<PowerFormulaTable>();
+            PowerFormula = stream.ReadSerializedData<PowerFormulaTable>(GameDataFormat.RecordSize(1328));
             stream.Position += 8;
-            Recipes = stream.ReadSerializedData<RecipeTable>();
+            Recipes = stream.ReadSerializedData<RecipeTable>(GameDataFormat.RecordSize(336));
             stream.Position += 8;
-            ScriptedAchievementEvents = stream.ReadSerializedData<ScriptedAchievementEventsTable>();
+            ScriptedAchievementEvents = stream.ReadSerializedData<ScriptedAchievementEventsTable>(GameDataFormat.RecordSize(264));
             stream.Position += 8;
-            LootRunQuestTierTables = stream.ReadSerializedData<LootRunQuestTierTable>();
+            LootRunQuestTierTables = stream.ReadSerializedData<LootRunQuestTierTable>(GameDataFormat.RecordSize(520));
             stream.Position += 8;
-            ParagonBonusesTables = stream.ReadSerializedData<ParagonBonusesTable>();
+            ParagonBonusesTables = stream.ReadSerializedData<ParagonBonusesTable>(GameDataFormat.RecordSize(736));
             stream.Position += 8;
-            LegacyItemConversionTables = stream.ReadSerializedData<LegacyItemConversionTable>();
+            LegacyItemConversionTables = stream.ReadSerializedData<LegacyItemConversionTable>(GameDataFormat.RecordSize(280));
             stream.Position += 8;
-            EnchantItemAffixUseCountCostScalarsTables = stream.ReadSerializedData<EnchantItemAffixUseCountCostScalarsTable>();
+            EnchantItemAffixUseCountCostScalarsTables = stream.ReadSerializedData<EnchantItemAffixUseCountCostScalarsTable>(GameDataFormat.RecordSize(8));
             stream.Position += 8;
-            TieredLootRunLevelTables = stream.ReadSerializedData<TieredLootRunLevelTable>();
+            TieredLootRunLevelTables = stream.ReadSerializedData<TieredLootRunLevelTable>(GameDataFormat.RecordSize(56));
             stream.Position += 8;
-            TransmuteRecipesTables = stream.ReadSerializedData<TransmuteRecipesTable>();
+            TransmuteRecipesTables = stream.ReadSerializedData<TransmuteRecipesTable>(GameDataFormat.RecordSize(440));
             stream.Position += 8;
-            CurrencyConversionTables = stream.ReadSerializedData<CurrencyConversionTable>();
+            CurrencyConversionTables = stream.ReadSerializedData<CurrencyConversionTable>(GameDataFormat.RecordSize(304));
             stream.Position += 8;
 
             #region Запись дампа вещей
@@ -290,7 +291,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int InheritedAffixFamily0 { get; private set; }
             public int[] Labels { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Name = stream.ReadString(256, true);
                 Hash = StringHashHelper.HashItemName(Name);
@@ -420,9 +421,10 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
             public int NewI0 { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
-                Name = stream.ReadString(256, true); //000                
+                var start = stream.Position;
+                Name = stream.ReadString(256, true); //000
                 Hash = StringHashHelper.HashItemName(Name); //256
 
                 GBID = stream.ReadValueS32(); //256
@@ -434,6 +436,8 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
                 Flags = stream.ReadValueS32(); //272 - 8 + 16 = 24
                 DyeType = stream.ReadValueS32(); //276
                 //this.NewI0 = stream.ReadValueS32();
+                if (GameDataFormat.IsInstalledGame)
+                    stream.Position += 4; // 2.8.0 inserted a field here; ItemLevel through Labels each move by 4
                 ItemLevel = stream.ReadValueS32(); //280
                 ItemAct = (eItemAct)stream.ReadValueS32(); //284 - 28 + 16 = 44
 
@@ -476,7 +480,8 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
                 //stream.Position += 16;
 
-                Pad = stream.ReadValueS32(); //440 - 200
+                if (!GameDataFormat.IsInstalledGame)
+                    Pad = stream.ReadValueS32(); //440 - 200; in 2.8.0 the labels end here instead
                 WeaponDamageMin = stream.ReadValueF32(); //444 - 204
                 WeaponDamageDelta = stream.ReadValueF32(); //448 - 208
                 DamageMinVariance = stream.ReadValueF32(); //452 - 212
@@ -520,6 +525,11 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
                 I38 = new int[6]; //1024
                 for (int i = 0; i < 6; i++)
                     I38[i] = stream.ReadValueS32();
+                if (GameDataFormat.IsInstalledGame)
+                {
+                    ReadTail280(stream, start);
+                    return;
+                }
 
                 LegendaryFamily = stream.ReadValueS32(); //1072
                 GemT = (GemType)stream.ReadValueS32(); //1076
@@ -558,6 +568,38 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
                 if (SNOSet != -1)// & Name.Contains("Unique"))
                 { }
 
+            }
+
+            /// <summary>
+            /// 2.8.0 records are 1408 bytes: 32 bytes were added after I38 and the jewel fields at the end were
+            /// reworked. Fields are read at their 2.8.0 offsets, matched to 2.7.4 by type and order. The fields after
+            /// Attribute1 aren't mapped yet and keep their defaults; the server doesn't use them.
+            /// </summary>
+            private void ReadTail280(Stream stream, long start)
+            {
+                stream.Position = start + 1096;
+                LegendaryFamily = stream.ReadValueS32(); //1096
+                stream.Position = start + 1108;
+                GemT = (GemType)stream.ReadValueS32(); //1108
+                CraftingTier = stream.ReadValueS32(); //1112
+                CraftingQuality = (Alpha)stream.ReadValueS32(); //1116
+                snoActorPageOfFatePortal = stream.ReadValueS32(); //1120
+                snoWorldPageOfFate1 = stream.ReadValueS32(); //1124
+                snoWorldPageOfFate2 = stream.ReadValueS32(); //1128
+                snoLevelAreaPageOfFatePortal = stream.ReadValueS32(); //1132
+                EnchantAffixIngredientsCount = stream.ReadValueS32(); //1136
+                EnchantAffixIngredients = new RecipeIngredient[6]; //1140
+                for (int i = 0; i < 6; i++)
+                    EnchantAffixIngredients[i] = new RecipeIngredient(stream);
+                EnchantAffixIngredientsCountX1 = stream.ReadValueS32(); //1188
+                EnchantAffixIngredientsX1 = new RecipeIngredient[6]; //1192
+                for (int i = 0; i < 6; i++)
+                    EnchantAffixIngredientsX1[i] = new RecipeIngredient(stream);
+                LegendaryPowerItemReplacement = stream.ReadValueS32(); //1240
+                SeasonRequiredToDrop = stream.ReadValueS32(); //1244
+                Attribute1 = new AttributeSpecifier[2]; //1248
+                for (int i = 0; i < 2; i++)
+                    Attribute1[i] = new AttributeSpecifier(stream);
             }
 
 
@@ -733,7 +775,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int SidekickTargetDPSIdeal { get; private set; }
             public float GearXPScalar { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 DeltaXP = stream.ReadValueS64();
                 DeltaXPClassic = stream.ReadValueS32();
@@ -902,7 +944,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int I30 { get; private set; }
 
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 L0 = stream.ReadValueS64(); //584
 
@@ -947,7 +989,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int S1 { get; private set; }
             public long S2 { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 S0 = stream.ReadValueS32();
                 S1 = stream.ReadValueS32();
@@ -1020,7 +1062,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public float Monster3AffixWeight { get; private set; }
             public float Monster4AffixWeight { get; private set; }
             public int Pad { get; private set; }
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 LvlMin = stream.ReadValueS32();
                 Str = stream.ReadValueF32();
@@ -1128,7 +1170,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int AssociatedAffix { get; private set; }
             public AttributeSpecifier[] AttributeSpecifier { get; private set; }
             public int AffixGroup { get; private set; }
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Name = stream.ReadString(256, true);
                 Hash = StringHashHelper.HashItemName(Name);
@@ -1260,7 +1302,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public float Thaw_Rate { get; private set; }
 
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 //stream.Position += 4;
                 Name = stream.ReadString(256, true);
@@ -1450,7 +1492,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             [PersistentPropertyAttribute("SNOPowerToBreakObjects")]
             public int SNOPowerToBreakObjects { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 stream.Position += 4;
                 Name = stream.ReadString(256, true);
@@ -1498,7 +1540,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int I2 { get; private set; }
             public int I3 { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 //stream.Position += 4;
                 Name = stream.ReadString(256, true);
@@ -1580,7 +1622,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             [PersistentPropertyAttribute("I11")]
             public int I11 { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 I0 = stream.ReadValueS32();
                 I1 = stream.ReadValueS32();
@@ -1618,7 +1660,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public AffixType AffixType { get; private set; }
             public int I2 { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Name = stream.ReadString(256, true);
                 I0 = stream.ReadValueS32();
@@ -1657,7 +1699,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
             public byte[] BS { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 //584
                 Name = stream.ReadString(256, true);
@@ -1707,7 +1749,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public string S0 { get; private set; }
             public int I2 { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Name = stream.ReadString(256, true);
                 Hash = StringHashHelper.HashItemName(Name);
@@ -1731,7 +1773,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public AttributeSpecifier[] ReqAttribute { get; private set; }
             public string S0 { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Name = stream.ReadString(256, true);
                 I0 = stream.ReadValueS32();
@@ -1756,7 +1798,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             [PersistentProperty("I0", 221)]
             public int[] I0 { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Name = stream.ReadString(256, true);
                 I0 = new int[221];
@@ -1836,7 +1878,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             [PersistentPropertyAttribute("I11")]
             public int I11 { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 I0 = stream.ReadValueS32();
                 I1 = stream.ReadValueS32();
@@ -1878,7 +1920,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             [PersistentProperty("F0", 22)]
             public float[] F0 { get; private set; }
             public int I2 { get; private set; }
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Name = stream.ReadString(256, true);
                 I0 = stream.ReadValueS32();
@@ -1900,7 +1942,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public float F5 { get; private set; }
             public int I0 { get; private set; }
             public int I1 { get; private set; }
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 HPMod = stream.ReadValueF32();
                 DmgMod = stream.ReadValueF32();
@@ -1918,7 +1960,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int TreasureClassSNO1 { get; private set; }
             public int TreasureClassSNO2 { get; private set; }
             public int TreasureClassSNO3 { get; private set; }
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 TreasureClassSNO0 = stream.ReadValueS32();
                 TreasureClassSNO1 = stream.ReadValueS32();
@@ -1951,7 +1993,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
             public float F10 { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 //
                 Name = stream.ReadString(256, true);
@@ -1986,7 +2028,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int Count { get; private set; }
             public AttributeSpecifier[] Attribute { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Name = stream.ReadString(256, true);
                 I0 = stream.ReadValueS32();
@@ -2075,7 +2117,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public float I2 { get; private set; }
 
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Name = stream.ReadString(256, true);
 
@@ -2134,7 +2176,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             [PersistentPropertyAttribute("Necessary")]
             public int Necesssary { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Head = stream.ReadValueS32();
                 Torso = stream.ReadValueS32();
@@ -2153,7 +2195,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public string S0 { get; private set; }
             public float[] F0 { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 S0 = stream.ReadString(1024, true);
                 F0 = new float[76];
@@ -2176,7 +2218,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int NumIngredients { get; private set; }
             public RecipeIngredient[] Ingredients { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Name = stream.ReadString(256, true);
                 Hash = StringHashHelper.HashItemName(Name);
@@ -2201,7 +2243,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int GBID { get; private set; }
             public int PAD { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Name = stream.ReadString(256, true);
                 GBID = stream.ReadValueS32();
@@ -2214,7 +2256,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int I0 { get; private set; }
             public int I1 { get; private set; }
             public LootRunQuestTierEntry[] LootRunQuestTierEntrys { get; private set; }
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Name = stream.ReadString(256, true);
                 I0 = stream.ReadValueS32();
@@ -2235,7 +2277,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int Index { get; private set; }
             public Class HeroClass { get; private set; }
             public string IconName { get; private set; }
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Name = stream.ReadString(256, true);
                 Hash = stream.ReadValueS32();
@@ -2249,6 +2291,8 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
                 AttributeSpecifiers = new AttributeSpecifier[4]; //856
                 for (int i = 0; i < 4; i++)
                     AttributeSpecifiers[i] = new AttributeSpecifier(stream);
+                if (GameDataFormat.IsInstalledGame)
+                    stream.Position += 4 * 24; // 2.8.0 added a second array of four attribute specifiers here
                 Category = stream.ReadValueS32(); //368 + 584 = 952
                 Index = stream.ReadValueS32();
                 HeroClass = (Class)stream.ReadValueS32();
@@ -2267,7 +2311,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int ConsoleIgnore { get; private set; }
             public int Pad { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Name = stream.ReadString(256, true);
                 GBID = stream.ReadValueS32();
@@ -2283,7 +2327,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int UseCount { get; private set; }
             public float CostMultiplier { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 UseCount = stream.ReadValueS32();
                 CostMultiplier = stream.ReadValueF32();
@@ -2305,7 +2349,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public float F8 { get; private set; }
             public float F9 { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 F0 = stream.ReadValueF32();
                 F1 = stream.ReadValueF32();
@@ -2333,7 +2377,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int Page { get; private set; }
             public int Hidden { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Name = stream.ReadString(256, true);
                 GBID = stream.ReadValueS32();
@@ -2359,7 +2403,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int Hidden { get; private set; }
             public int AutoPickup { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
 
                 Name = stream.ReadString(256, true);
@@ -2546,7 +2590,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int ItemsGBID { get; private set; }
             public int Count { get; private set; }
 
-            public RecipeIngredient(MpqFileStream stream)
+            public RecipeIngredient(Stream stream)
             {
                 ItemsGBID = stream.ReadValueS32();
                 Count = stream.ReadValueS32();
@@ -2558,7 +2602,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int TypeValue { get; private set; }
             public int Quantity { get; private set; }
 
-            public TransmuteRecipeIngredient(MpqFileStream stream)
+            public TransmuteRecipeIngredient(Stream stream)
             {
                 Type = stream.ReadValueS32();
                 TypeValue = stream.ReadValueS32();
@@ -2572,7 +2616,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int GBID { get; private set; }
             public int ItemsGBID { get; private set; }
 
-            public LootRunQuestTierEntry(MpqFileStream stream)
+            public LootRunQuestTierEntry(Stream stream)
             {
                 QuestSNO = stream.ReadValueS32();
                 F0 = stream.ReadValueF32();
@@ -2587,7 +2631,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int SNOParam { get; private set; }
             public List<int> Formula { get; private set; }
 
-            public AttributeSpecifier(MpqFileStream stream)
+            public AttributeSpecifier(Stream stream)
             {
                 AttributeId = stream.ReadValueS32();
                 SNOParam = stream.ReadValueS32();

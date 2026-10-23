@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.GameServer.Core.Types.Math;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 using DiIiS_NA.GameServer.Core.Types.Collision;
@@ -41,7 +42,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public string CastingNotes { get; private set; }
         public string VoiceOverRole { get; private set; }
 
-        public ActorData(MpqFile file)
+        public ActorData(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);
@@ -108,7 +109,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public AABB AABBCollision { get; private set; }
         public float MovingRadiusScalar { get; private set; }
 
-        public ActorCollisionData(MpqFileStream stream)
+        public ActorCollisionData(Stream stream)
         {
             CollFlags = new ActorCollisionFlags(stream);
             CollisiionShape = stream.ReadValueS32();
@@ -126,7 +127,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I2 { get; private set; }
         public int I3 { get; private set; }
 
-        public ActorCollisionFlags(MpqFileStream stream)
+        public ActorCollisionFlags(Stream stream)
         {
             I0 = stream.ReadValueS32();
             I1 = stream.ReadValueS32();
@@ -141,7 +142,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public float Ax1 { get; private set; }
         public float Ax2 { get; private set; }
 
-        public AxialCylinder(MpqFileStream stream)
+        public AxialCylinder(Stream stream)
         {
             Position = new Vector3D(stream.ReadValueF32(), stream.ReadValueF32(), stream.ReadValueF32());
             Ax1 = stream.ReadValueF32();
@@ -154,7 +155,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public Vector3D Position { get; private set; }
         public float Radius { get; private set; }
 
-        public Sphere(MpqFileStream stream)
+        public Sphere(Stream stream)
         {
             Position = new Vector3D(stream.ReadValueF32(), stream.ReadValueF32(), stream.ReadValueF32());
             Radius = stream.ReadValueF32();
@@ -166,7 +167,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public string LookLink { get; private set; }
         public int Int0 { get; private set; }
 
-        public WeightedLook(MpqFileStream stream)
+        public WeightedLook(Stream stream)
         {
             LookLink = stream.ReadString(64, true);
             Int0 = stream.ReadValueS32();

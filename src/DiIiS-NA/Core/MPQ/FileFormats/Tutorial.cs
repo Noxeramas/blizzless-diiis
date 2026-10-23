@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using CrystalMpq;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.SNO;
@@ -20,7 +21,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public Vector2D Offset { get; private set; }
         public int Pad { get; private set; }
 
-        public Tutorial(MpqFile file)
+        public Tutorial(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);

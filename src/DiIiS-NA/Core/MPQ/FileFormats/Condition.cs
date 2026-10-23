@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 using Gibbed.IO;
@@ -66,7 +67,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I32 { get; private set; }
 
 
-        public Condition(MpqFile file)
+        public Condition(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream); //0
@@ -167,7 +168,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int SNOLore { get; private set; }
         public int I0 { get; private set; }
 
-        public LoreSubcondition(MpqFileStream stream)
+        public LoreSubcondition(Stream stream)
         {
             SNOLore = stream.ReadValueS32();
             I0 = stream.ReadValueS32();
@@ -181,7 +182,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I1 { get; private set; }
         public int I2 { get; private set; }
 
-        public QuestSubcondition(MpqFileStream stream)
+        public QuestSubcondition(Stream stream)
         {
             SNOQuest = stream.ReadValueS32();
             I0 = stream.ReadValueS32();
@@ -197,7 +198,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I1 { get; private set; }
         public int I2 { get; private set; }
 
-        public ItemSubcondition(MpqFileStream stream)
+        public ItemSubcondition(Stream stream)
         {
             ItemGBId = stream.ReadValueS32();
             I0 = stream.ReadValueS32();
@@ -211,7 +212,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public FollowerType Type { get; private set; }
         public int I0 { get; private set; }
 
-        public FollowerSubcondition(MpqFileStream stream)
+        public FollowerSubcondition(Stream stream)
         {
             Type = (FollowerType)stream.ReadValueS32();
             I0 = stream.ReadValueS32();
@@ -223,7 +224,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int LabelGBId { get; private set; }
         public int I0 { get; private set; }
 
-        public LabelSubcondition(MpqFileStream stream)
+        public LabelSubcondition(Stream stream)
         {
             LabelGBId = stream.ReadValueS32();
             I0 = stream.ReadValueS32();
@@ -236,7 +237,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I0 { get; private set; }
         public int I1 { get; private set; }
 
-        public SkillSubcondition(MpqFileStream stream)
+        public SkillSubcondition(Stream stream)
         {
             SNOSkillPower = stream.ReadValueS32();
             I0 = stream.ReadValueS32();
@@ -248,7 +249,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
     {
         public int SNOMonsterActor { get; private set; }
 
-        public MonsterSubcondition(MpqFileStream stream)
+        public MonsterSubcondition(Stream stream)
         {
             SNOMonsterActor = stream.ReadValueS32();
         }
@@ -258,7 +259,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
     {
         public string S0 { get; private set; }
 
-        public GameFlagSubcondition(MpqFileStream stream)
+        public GameFlagSubcondition(Stream stream)
         {
             S0 = stream.ReadString(128, true);
         }
@@ -268,7 +269,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
     {
         public string S0 { get; private set; }
 
-        public PlayerFlagSubcondition(MpqFileStream stream)
+        public PlayerFlagSubcondition(Stream stream)
         {
             S0 = stream.ReadString(128, true);
         }
@@ -280,7 +281,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I0 { get; private set; }
         public int I1 { get; private set; }
 
-        public BuffSubcondition(MpqFileStream stream)
+        public BuffSubcondition(Stream stream)
         {
             SNOPower = stream.ReadValueS32();
             I0 = stream.ReadValueS32();

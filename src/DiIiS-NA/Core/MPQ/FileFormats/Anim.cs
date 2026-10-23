@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.Math;
 using DiIiS_NA.GameServer.Core.Types.SNO;
@@ -18,7 +19,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int PermutationCount { get; private set; }
         public int MachineTime { get; private set; }
 
-        public Anim(MpqFile file)
+        public Anim(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);
@@ -71,7 +72,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public VelocityVector3D AvgVelocity { get; private set; }
         public HardPointLink HardPointLink { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             Flags = stream.ReadValueS32();
             PermutationName = stream.ReadString(65, true);
@@ -126,7 +127,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
     {
         public string Name { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             Name = stream.ReadString(64, true);
         }
@@ -137,7 +138,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I0 { get; private set; }
         public List<TranslationKey> Keys { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             I0 = stream.ReadValueS32();
             Keys = stream.ReadSerializedData<TranslationKey>();
@@ -149,7 +150,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I0 { get; private set; }
         public List<RotationKey> Keys { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             I0 = stream.ReadValueS32();
             Keys = stream.ReadSerializedData<RotationKey>();
@@ -161,7 +162,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I0 { get; private set; }
         public List<ScaleKey> Keys { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             I0 = stream.ReadValueS32();
             Keys = stream.ReadSerializedData<ScaleKey>();
@@ -173,7 +174,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I0 { get; private set; }
         public Vector3D Location { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             I0 = stream.ReadValueS32();
             Location = new Vector3D(stream);
@@ -185,7 +186,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I0 { get; private set; }
         public Quaternion16 Q0 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             I0 = stream.ReadValueS32();
             Q0 = new Quaternion16(stream);
@@ -197,7 +198,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I0 { get; private set; }
         public float Scale { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             I0 = stream.ReadValueS32();
             Scale = stream.ReadValueF32();
@@ -209,7 +210,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public float KeyframeIndex { get; private set; }
         public TriggerEvent Event { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             KeyframeIndex = stream.ReadValueF32();
             Event = new TriggerEvent(stream);
@@ -222,7 +223,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public float VelocityY { get; private set; }
         public float VelocityZ { get; private set; }
 
-        public VelocityVector3D(MpqFileStream stream)
+        public VelocityVector3D(Stream stream)
         {
             VelocityX = stream.ReadValueF32();
             VelocityY = stream.ReadValueF32();
@@ -243,7 +244,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         /// Reads Quaternion16 from given MPQFileStream.
         /// </summary>
         /// <param name="stream">The MPQFileStream to read from.</param>
-        public Quaternion16(MpqFileStream stream)
+        public Quaternion16(Stream stream)
         {
             Short0 = stream.ReadValueS16();
             Short1 = stream.ReadValueS16();

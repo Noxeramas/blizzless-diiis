@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using Gibbed.IO;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
@@ -16,7 +17,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int SNOConversation { get; private set; }
         public int I3 { get; private set; }
 
-        public Lore(MpqFile file)
+        public Lore(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);

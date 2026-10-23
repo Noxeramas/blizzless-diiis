@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using CrystalMpq;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.Core.Storage;
@@ -38,7 +39,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public World() { }
 
-        public World(MpqFile file)
+        public World(IAssetFile file)
         {
             var stream = file.Open();
 
@@ -75,7 +76,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public SceneParams() { }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             SceneChunks = stream.ReadSerializedData<SceneChunk>();
             ChunkCount = stream.ReadValueS32();
@@ -100,7 +101,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public SceneChunk() { }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             SNOHandle = new SNOHandle(stream);
             PRTransform = new PRTransform(stream);
@@ -156,7 +157,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         [PersistentProperty("TagMap")]
         public TagMap TagMap { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             Tiles = stream.ReadSerializedData<TileInfo>();
 
@@ -212,7 +213,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         [PersistentProperty("CustomTileInfo")]
         public CustomTileInfo CustomTileInfo { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             ExitDirectionBits = stream.ReadValueS32();
             TileType = stream.ReadValueS32();
@@ -246,7 +247,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         [PersistentProperty("TagMap")]
         public TagMap TagMap { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             Name = stream.ReadString(128, true);
             CommandType = stream.ReadValueS32();
@@ -274,7 +275,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public CustomTileInfo() { }
 
-        public CustomTileInfo(MpqFileStream stream)
+        public CustomTileInfo(Stream stream)
         {
             Int0 = stream.ReadValueS32();
             SizeX = stream.ReadValueS32();
@@ -307,7 +308,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public CustomTileCell() { }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             Int0 = stream.ReadValueS32();
             TileType = stream.ReadValueS32();
@@ -335,7 +336,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public SceneClusterSet() { }
 
-        public SceneClusterSet(MpqFileStream stream)
+        public SceneClusterSet(Stream stream)
         {
             ClusterCount = stream.ReadValueS32();
             stream.Position += (4 * 3);
@@ -368,7 +369,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             SubSceneGroups = new List<SubSceneGroup> { };
         }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             Name = stream.ReadString(128, true);
             ClusterId = stream.ReadValueS32();
@@ -391,12 +392,12 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public SubSceneGroup() { }
 
-        public SubSceneGroup(MpqFileStream stream)
+        public SubSceneGroup(Stream stream)
         {
             Read(stream);
         }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             I0 = stream.ReadValueS32();
             SubSceneCount = stream.ReadValueS32();
@@ -426,7 +427,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             Labels = new List<SubSceneLabel> { };
         }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             SNOScene = stream.ReadValueS32();
             Probability = stream.ReadValueS32();
@@ -443,7 +444,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         [PersistentProperty("I0")]
         public int I0 { get; set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             GBId = stream.ReadValueS32();
             I0 = stream.ReadValueS32();
@@ -463,7 +464,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public LabelRuleSet() { }
 
-        public LabelRuleSet(MpqFileStream stream)
+        public LabelRuleSet(Stream stream)
         {
             Rulecount = stream.ReadValueS32();
             stream.Position += (3 * 4);
@@ -486,7 +487,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public LabelRule() { }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             Name = stream.ReadString(128, true);
             LabelCondition = new LabelCondition(stream);
@@ -512,7 +513,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public LabelEntry() { }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             GBIdLabel = stream.ReadValueS32();
             Int0 = stream.ReadValueS32();
@@ -527,7 +528,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public float[] I0 { get; private set; }
         public float[] I1 { get; private set; }
 
-        public PostFXParams(MpqFileStream stream)
+        public PostFXParams(Stream stream)
         {
             //Int0 = stream.ReadValueS32();
             I0 = new float[4];
@@ -552,7 +553,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public LabelCondition() { }
 
-        public LabelCondition(MpqFileStream stream)
+        public LabelCondition(Stream stream)
         {
             Enum0 = (DT_ENUM0)stream.ReadValueS32();
             Flags = stream.ReadValueS32();
@@ -590,7 +591,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int snoIrradianceTexDead { get; private set; }
         public float FarPlaneCap { get; private set; }
 
-        public Environment(MpqFileStream stream)
+        public Environment(Stream stream)
         {
             stream.Position += 28;
             RGBASkyColor = new RGBAColor(stream);
@@ -629,7 +630,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int Int2 { get; private set; }
 
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             //stream.Position += 8;
             DRLGParams = stream.ReadSerializedData<DRLGParams>();

@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.Core.Storage;
 using DiIiS_NA.GameServer.Core.Types.Math;
 using DiIiS_NA.GameServer.MessageSystem;
@@ -84,7 +85,7 @@ namespace DiIiS_NA.GameServer.Core.Types.Scene
 		/// Reads SceneSpecification from given MPQFileStream.
 		/// </summary>
 		/// <param name="stream">The MPQFileStream to read from.</param>
-		public SceneSpecification(MpqFileStream stream)
+		public SceneSpecification(Stream stream)
 		{
 			CellZ = stream.ReadValueS32();
 			Cell = new Vector2D(stream);

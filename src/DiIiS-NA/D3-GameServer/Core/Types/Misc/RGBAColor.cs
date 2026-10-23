@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.GameServer.MessageSystem;
 using System;
 using System.Collections.Generic;
@@ -21,10 +22,10 @@ namespace DiIiS_NA.GameServer.Core.Types.Misc
 		/// Reads RGBAColor from given MPQFileStream.
 		/// </summary>
 		/// <param name="stream">The MPQFileStream to read from.</param>
-		public RGBAColor(MpqFileStream stream)
+		public RGBAColor(Stream stream)
 		{
 			var buf = new byte[4];
-			stream.Read(buf, 0, 4);
+			stream.ReadExactly(buf, 0, 4);
 			Red = buf[0];
 			Green = buf[1];
 			Blue = buf[2];

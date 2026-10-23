@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.IO;
 using CrystalMpq;
 using DiIiS_NA.Core.MPQ;
 using DiIiS_NA.GameServer.MessageSystem;
@@ -45,12 +46,12 @@ namespace DiIiS_NA.GameServer.Core.Types.Math
 		/// Reads Vector3D from given MPQFileStream.
 		/// </summary>
 		/// <param name="stream">The MPQFileStream to read from.</param>
-		public Vector3D(MpqFileStream stream)
+		public Vector3D(Stream stream)
 			: this(stream.ReadValueF32(), stream.ReadValueF32(), stream.ReadValueF32())
 		{
 		}
 
-		public void Read(MpqFileStream stream)
+		public void Read(Stream stream)
 		{
 			X = stream.ReadValueF32();
 			Y = stream.ReadValueF32();

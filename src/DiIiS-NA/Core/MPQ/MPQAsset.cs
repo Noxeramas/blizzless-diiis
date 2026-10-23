@@ -9,7 +9,7 @@ namespace DiIiS_NA.Core.MPQ
 {
     public class MPQAsset : Asset
     {
-        public MpqFile MpqFile { get; set; }
+        public IAssetFile MpqFile { get; set; }
 
         protected override bool SourceAvailable
         {

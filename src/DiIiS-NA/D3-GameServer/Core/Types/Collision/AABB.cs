@@ -1,4 +1,5 @@
 ﻿using DiIiS_NA.Core.Storage;
+using System.IO;
 using System.Text;
 using CrystalMpq;
 using Gibbed.IO;
@@ -28,7 +29,7 @@ namespace DiIiS_NA.GameServer.Core.Types.Collision
 		/// Reads AABB from given MPQFileStream.
 		/// </summary>
 		/// <param name="stream">The MPQFileStream to read from.</param>
-		public AABB(MpqFileStream stream)
+		public AABB(Stream stream)
 		{
 			Min = new Vector3D(stream.ReadValueF32(), stream.ReadValueF32(), stream.ReadValueF32());
 			Max = new Vector3D(stream.ReadValueF32(), stream.ReadValueF32(), stream.ReadValueF32());

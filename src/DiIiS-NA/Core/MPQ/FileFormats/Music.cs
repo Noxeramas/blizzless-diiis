@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 
@@ -14,7 +15,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         }
 
-        public Music(MpqFile file)
+        public Music(IAssetFile file)
         {
             var stream = file.Open();
 

@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using Gibbed.IO;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
@@ -14,7 +15,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 		public List<SceneGroupItem> Items { get; private set; }
 		public int I1 { get; private set; }
 
-		public SceneGroup(MpqFile file)
+		public SceneGroup(IAssetFile file)
 		{
 			var stream = file.Open();
 			Header = new Header(stream);
@@ -32,7 +33,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 		public int I0 { get; private set; }
 		public int LabelGBId { get; private set; }
 
-		public void Read(MpqFileStream stream)
+		public void Read(Stream stream)
 		{
 			SNOScene = stream.ReadValueS32();
 			I0 = stream.ReadValueS32();

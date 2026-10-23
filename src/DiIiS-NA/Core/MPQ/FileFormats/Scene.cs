@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using CrystalMpq;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.SNO;
@@ -30,7 +31,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int SNOAppearance { get; private set; }
         public int SNOPhysMesh { get; private set; }
 
-        public Scene(MpqFile file)
+        public Scene(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);
@@ -82,7 +83,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public byte[,] WalkGrid;
             //public string Filename { get; private set; }
 
-            public NavMeshDef(MpqFileStream stream)
+            public NavMeshDef(Stream stream)
             {
                 SquaresCountX = stream.ReadValueS32();
                 SquaresCountY = stream.ReadValueS32();
@@ -142,7 +143,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int BorderDataCount { get; private set; }
             public List<NavCellBorderData> BorderData = new List<NavCellBorderData>();
 
-            public NavZoneDef(MpqFileStream stream)
+            public NavZoneDef(Stream stream)
             {
                 NavCellCount = stream.ReadValueS32();
                 stream.Position += (3 * 4);
@@ -175,7 +176,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public float Z { get; private set; }
             public NavCellFlags Flags { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Z = stream.ReadValueF32();
                 Flags = (NavCellFlags)stream.ReadValueS32();
@@ -190,7 +191,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public short NeighbourCount { get; private set; }
             public int NeighborsIndex { get; private set; }
             public RectangleF Bounds { get { return new RectangleF(Min.X, Min.Y, Max.X - Min.X, Max.Y - Min.Y); } }
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Min = new Vector3D(stream.ReadValueF32(), stream.ReadValueF32(), stream.ReadValueF32());
                 Max = new Vector3D(stream.ReadValueF32(), stream.ReadValueF32(), stream.ReadValueF32());
@@ -229,7 +230,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public short Flags { get; private set; }
             public short WCell { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Flags = stream.ReadValueS16();
                 WCell = stream.ReadValueS16();
@@ -242,7 +243,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public short W1 { get; private set; }
             public short W2 { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Flags = stream.ReadValueS16();
                 W1 = stream.ReadValueS16();
@@ -255,7 +256,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public short W0 { get; private set; }
             public short W1 { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 W0 = stream.ReadValueS16();
                 W1 = stream.ReadValueS16();

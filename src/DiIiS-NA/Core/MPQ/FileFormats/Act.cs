@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.Math;
 using DiIiS_NA.GameServer.Core.Types.SNO;
@@ -16,7 +17,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public ResolvedPortalDestination ResolvedPortalDestination { get; private set; }
         public ActStartLocOverride[] ActStartLocOverrides { get; private set; }
 
-        public Act(MpqFile file)
+        public Act(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);
@@ -52,7 +53,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public float Y { get; private set; }
         public Vector2D Coords { get; private set; }
 
-        public WaypointInfo(MpqFileStream stream)
+        public WaypointInfo(Stream stream)
         {
             Flags = stream.ReadValueS32();
             SNOWorld = stream.ReadValueS32();
@@ -75,7 +76,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int HubWorldsSNO { get; private set; }
         public int DisallowReturnToTown { get; private set; }
 
-        public ActStartLocOverride(MpqFileStream stream)
+        public ActStartLocOverride(Stream stream)
         {
             ResolvedPortalDestination = new ResolvedPortalDestination(stream);
             SNOQuestRange = stream.ReadValueS32();
@@ -91,7 +92,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int EntranceGUID { get; private set; }
         public int SNODestLevelArea { get; private set; }
 
-        public ResolvedPortalDestination(MpqFileStream stream)
+        public ResolvedPortalDestination(Stream stream)
         {
             SNOWorld = stream.ReadValueS32();
             EntranceGUID = stream.ReadValueS32();
@@ -103,7 +104,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
     {
         public int SNOQuest { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             SNOQuest = stream.ReadValueS32();
         }

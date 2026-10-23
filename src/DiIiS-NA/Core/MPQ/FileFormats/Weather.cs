@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 
@@ -40,7 +41,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
         public Weather() { }
 
-        public Weather(MpqFile file)
+        public Weather(IAssetFile file)
         {
             var stream = file.Open();
 

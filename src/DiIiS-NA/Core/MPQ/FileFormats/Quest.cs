@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using CrystalMpq;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.SNO;
@@ -25,9 +26,9 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public QuestMode QuestMode { get; private set; }
         public BountyData BountyData0 { get; private set; }
 
-        public Quest(MpqFile file)
+        public Quest(IAssetFile file)
         {
-            MpqFileStream stream = file.Open();
+            Stream stream = file.Open();
 
             Header = new Header(stream);
             //+16
@@ -71,7 +72,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public List<QuestStepObjectiveSet> StepObjectiveSets { get; private set; }
         public List<QuestStepFailureConditionSet> StepFailureConditionSets { get; private set; }
 
-        public QuestUnassignedStep(MpqFileStream stream)
+        public QuestUnassignedStep(Stream stream)
         {
             //+56
 
@@ -89,7 +90,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int FollowUpStepID { get; private set; }
         public List<QuestStepObjective> StepObjectives { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             FollowUpStepID = stream.ReadValueS32();
             stream.Position += (3 * 4);
@@ -113,7 +114,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I5 { get; private set; }
         public int GBIDItemToShow { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             //352
             I0 = stream.ReadValueS32();
@@ -140,7 +141,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
     {
         public List<QuestStepFailureCondition> QuestStepFailureConditions { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             stream.Position += 8;
             QuestStepFailureConditions = stream.ReadSerializedData<QuestStepFailureCondition>();
@@ -159,7 +160,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public string Unknown1 { get; private set; }
         public string Unknown2 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             ConditionType = (QuestStepFailureConditionType)stream.ReadValueS32();
             I2 = stream.ReadValueS32();
@@ -181,7 +182,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int Min { get; private set; }
         public int Max { get; private set; }
 
-        public QuestLevelRange(MpqFileStream stream)
+        public QuestLevelRange(Stream stream)
         {
             Min = stream.ReadValueS32();
             Max = stream.ReadValueS32();
@@ -214,7 +215,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int BossEncounterSNO { get; private set; }
         public float F0 { get; private set; }
 
-        public BountyData(MpqFileStream stream)
+        public BountyData(Stream stream)
         {
             ActData = (ActT)stream.ReadValueS32();
             Type = (BountyType)stream.ReadValueS32();
@@ -294,7 +295,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public List<QuestStepBonusObjectiveSet> StepBonusObjectiveSets { get; private set; }
         public List<QuestStepFailureConditionSet> StepFailureConditionSets { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             Name = stream.ReadString(16, true); //+600 - 
             ID = stream.ReadValueS32(); //616
@@ -337,7 +338,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I5 { get; private set; }
         public List<QuestStepObjective> StepBonusObjectives { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             //for (int i = 0; i < I0.Length; i++)
             //    I0[i] = stream.ReadValueS32();
@@ -359,7 +360,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int ID { get; private set; }
         public int I2 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             Unknown = stream.ReadString(16, true);
             ID = stream.ReadValueS32();

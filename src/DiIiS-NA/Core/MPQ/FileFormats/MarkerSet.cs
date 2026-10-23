@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 using DiIiS_NA.GameServer.Core.Types.Collision;
@@ -21,7 +22,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int SpecialIndexCount { get; private set; }
         public List<short> SpecialIndexList { get; private set; }
 
-        public MarkerSet(MpqFile file)
+        public MarkerSet(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);//0
@@ -56,7 +57,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int MarkerLinksCount { get; private set; }
         public List<MarkerLink> MarkerLinks = new List<MarkerLink>();
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             Name = stream.ReadString(128, true);
             Type = (MarkerType)stream.ReadValueS32();
@@ -80,7 +81,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public Vector2F Center { get; private set; }
         public float Radius { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             Center = new Vector2F(stream.ReadValueF32(), stream.ReadValueF32());
             Radius = stream.ReadValueF32();
@@ -92,7 +93,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public string String1 { get; private set; }
         public string String2 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             String1 = stream.ReadString(128, true);
             String2 = stream.ReadString(128, true);

@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 
@@ -10,7 +11,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public Header Header { get; private set; }
         public ItemSpecifierData ItemSpecifierData { get; private set; }
 
-        public Recipe(MpqFile file)
+        public Recipe(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);

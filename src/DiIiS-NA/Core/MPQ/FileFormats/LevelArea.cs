@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using CrystalMpq;
 using Gibbed.IO;
 using DiIiS_NA.GameServer.Core.Types.SNO;
@@ -17,7 +18,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int SNOLevelArea1 { get; private set; }
         public List<LevelAreaServerData> LevelAreaServerData { get; private set; }
 
-        public LevelArea(MpqFile file)
+        public LevelArea(IAssetFile file)
         {
 
             var stream = file.Open();
@@ -42,7 +43,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I0 { get; private set; }
         public List<LevelAreaSpawnPopulation> SpawnPopulation { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             SNOLevelArea0 = stream.ReadValueS32();
             LocSet = new GizmoLocSet(stream);
@@ -56,7 +57,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
     {
         public GizmoLocSpawnType[] SpawnType { get; private set; }
 
-        public GizmoLocSet(MpqFileStream stream)
+        public GizmoLocSet(Stream stream)
         {
             //stream.Position = 0;
             SpawnType = new GizmoLocSpawnType[52];
@@ -71,7 +72,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public string Description { get; private set; }
         public string Comment { get; private set; }
 
-        public GizmoLocSpawnType(MpqFileStream stream)
+        public GizmoLocSpawnType(Stream stream)
         {
             stream.Position += 8;
             SpawnEntry = stream.ReadSerializedData<GizmoLocSpawnEntry>();
@@ -88,7 +89,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int MaxTimesPicked { get; private set; }
 
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             SNOHandle = new SNOHandle(stream);
             ForceRandomFacing = stream.ReadValueS32();
@@ -109,7 +110,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int ConditionSNO { get; private set; }
         public List<GizmoLocSpawnChoice> GizmoLocSpawnChoices { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             Min = stream.ReadValueS32();
             Max = stream.ReadValueS32();
@@ -142,7 +143,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public List<int> SNOs { get; private set; }
         [PersistentProperty("SpawnGroup")]
         public int SNO { get; private set; }
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             Description = stream.ReadString(64, true);
             I0 = stream.ReadValueS32();
@@ -185,7 +186,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         [PersistentProperty("I3")]
         public int I3 { get; private set; }
         public int SNO { get; private set; }
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             GroupType = (SpawnGroupType)stream.ReadValueS32();
             F0 = stream.ReadValueF32();
@@ -222,7 +223,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I3 { get; private set; }
         public float F0 { get; private set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             SNOHandle = new SNOHandle(stream);
             SpawnType = (SpawnType)stream.ReadValueS32();

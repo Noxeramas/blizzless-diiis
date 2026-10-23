@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using CrystalMpq;
@@ -73,7 +74,7 @@ namespace DiIiS_NA.GameServer.Core.Types.TagMap
 		}
 
 
-		public void Read(MpqFileStream stream)
+		public void Read(Stream stream)
 		{
 			TagMapSize = stream.ReadValueS32();
 			_tagMapEntries = new Dictionary<int, TagMapEntry>();
@@ -221,7 +222,7 @@ namespace DiIiS_NA.GameServer.Core.Types.TagMap
 
 		}
 
-		public TagMapEntry(MpqFileStream stream)
+		public TagMapEntry(Stream stream)
 		{
 			Type = stream.ReadValueS32();
 			TagID = stream.ReadValueS32();

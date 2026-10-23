@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using CrystalMpq;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.SNO;
@@ -73,7 +74,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int Pad { get; private set; }
         public int snoAIStateAttackerCapReached { get; private set; }
 
-        public Monster(MpqFile file)
+        public Monster(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);
@@ -193,7 +194,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public float Weight { get; private set; }
             public int SpawnItemCount { get; private set; }
             public List<MonsterMinionSpawnItem> SpawnItems = new List<MonsterMinionSpawnItem>();
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Weight = stream.ReadValueF32();
                 SpawnItemCount = stream.ReadValueS32();
@@ -207,7 +208,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public float Weight { get; private set; }
             public int SpawnItemCount { get; private set; }
             public List<MonsterChampionSpawnItem> SpawnItems = new List<MonsterChampionSpawnItem>();
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 Weight = stream.ReadValueF32();
                 SpawnItemCount = stream.ReadValueS32();
@@ -224,7 +225,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int SpawnSpreadMin { get; private set; }
             public int SpawnSpreadMax { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 SNOSpawn = stream.ReadValueS32();
                 SpawnCountMin = stream.ReadValueS32();
@@ -239,7 +240,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int SnoActor { get; private set; }
             public int SpawnCount { get; private set; }
 
-            public void Read(MpqFileStream stream)
+            public void Read(Stream stream)
             {
                 SnoActor = stream.ReadValueS32();
                 SpawnCount = stream.ReadValueS32();
@@ -254,7 +255,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public float WarnOthersRadius { get; private set; }
             public int RequireLOSforAllTargets { get; private set; }
 
-            public MonsterDef(MpqFileStream stream)
+            public MonsterDef(Stream stream)
             {
                 IdleRadius = stream.ReadValueF32();
                 CombatRaidus = stream.ReadValueF32();
@@ -270,7 +271,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int Weight { get; private set; }
             public float Timer { get; private set; }
 
-            public MonsterSkillDeclaration(MpqFileStream stream)
+            public MonsterSkillDeclaration(Stream stream)
             {
                 UseRangeMin = stream.ReadValueF32();
                 UseRangeMax = stream.ReadValueF32();
@@ -283,7 +284,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int SNOPower { get; private set; }
             public int LevelMod { get; private set; }
 
-            public SkillDeclaration(MpqFileStream stream)
+            public SkillDeclaration(Stream stream)
             {
                 SNOPower = stream.ReadValueS32();
                 LevelMod = stream.ReadValueS32();
@@ -309,7 +310,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
             public int GBID { get; private set; }
             public int HealthDropStyle { get; private set; }
 
-            public HealthDropInfo(MpqFileStream stream)
+            public HealthDropInfo(Stream stream)
             {
                 DropChance = stream.ReadValueF32();
                 GBID = stream.ReadValueS32();

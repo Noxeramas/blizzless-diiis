@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using CrystalMpq;
 using Gibbed.IO;
 using DiIiS_NA.GameServer.Core.Types.SNO;
@@ -13,7 +14,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int SNOSpawn { get; private set; }
         public List<EncounterSpawnOptions> Spawnoptions = new List<EncounterSpawnOptions>();
 
-        public Encounter(MpqFile file)
+        public Encounter(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);
@@ -31,7 +32,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I1 { get; set; }
         public int SNOCondition { get; set; }
 
-        public void Read(MpqFileStream stream)
+        public void Read(Stream stream)
         {
             SNOSpawn = stream.ReadValueS32();
             Probability = stream.ReadValueS32();

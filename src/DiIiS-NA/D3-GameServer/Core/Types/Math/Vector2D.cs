@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.Core.Storage;
 using DiIiS_NA.GameServer.MessageSystem;
 using Gibbed.IO;
@@ -20,7 +21,7 @@ namespace DiIiS_NA.GameServer.Core.Types.Math
 		/// Reads Vector2D from given MPQFileStream.
 		/// </summary>
 		/// <param name="stream">The MPQFileStream to read from.</param>
-		public Vector2D(MpqFileStream stream)
+		public Vector2D(Stream stream)
 		{
 			X = stream.ReadValueS32();
 			Y = stream.ReadValueS32();

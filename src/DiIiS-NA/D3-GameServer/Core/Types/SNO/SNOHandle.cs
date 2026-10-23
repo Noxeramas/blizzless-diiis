@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.Core.MPQ;
 using DiIiS_NA.Core.Storage;
 using DiIiS_NA.GameServer.MessageSystem;
@@ -129,7 +130,7 @@ namespace DiIiS_NA.GameServer.Core.Types.SNO
 		/// Reads SNOName from given MPQFileStream.
 		/// </summary>
 		/// <param name="stream">The MPQFileStream to read from.</param>
-		public SNOHandle(MpqFileStream stream)
+		public SNOHandle(Stream stream)
 		{
 			_group = (SNOGroup)stream.ReadValueS32();
 			Id = stream.ReadValueS32();

@@ -1,4 +1,5 @@
 ﻿using CrystalMpq;
+using System.IO;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.SNO;
 using Gibbed.IO;
@@ -16,7 +17,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I2 { get; private set; }
         public Anim2DFrame Anim2DFrame { get; private set; }
 
-        public Animation2D(MpqFile file)
+        public Animation2D(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream);
@@ -39,7 +40,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int I1 { get; private set; }
         public int I2 { get; private set; }
 
-        public FrameAnim(MpqFileStream stream)
+        public FrameAnim(Stream stream)
         {
             I0 = stream.ReadValueS32();
             Velocity0 = stream.ReadValueF32();
@@ -53,7 +54,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public string Text { get; private set; }
         public DT_RGBACOLOR DT_RGBACOLOR { get; private set; }
 
-        public Anim2DFrame(MpqFileStream stream)
+        public Anim2DFrame(Stream stream)
         {
             Text = stream.ReadString(64);
             DT_RGBACOLOR = new DT_RGBACOLOR(stream);
@@ -66,7 +67,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public byte B2 { get; private set; }
         public byte B3 { get; private set; }
 
-        public DT_RGBACOLOR(MpqFileStream stream)
+        public DT_RGBACOLOR(Stream stream)
         {
             B0 = stream.ReadValueU8();
             B1 = stream.ReadValueU8();

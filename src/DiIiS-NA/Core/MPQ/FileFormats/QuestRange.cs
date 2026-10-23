@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using CrystalMpq;
 using DiIiS_NA.Core.MPQ.FileFormats.Types;
 using DiIiS_NA.GameServer.Core.Types.SNO;
@@ -21,7 +22,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int[] TestMass { get; private set; }
 
 
-        public QuestRange(MpqFile file)
+        public QuestRange(IAssetFile file)
         {
             var stream = file.Open();
             Header = new Header(stream); //0
@@ -43,7 +44,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public QuestTime Start { get; private set; }
         public QuestTime End { get; private set; }
 
-        public QuestTimeEntity(MpqFileStream stream)
+        public QuestTimeEntity(Stream stream)
         {
             Start = new QuestTime(stream);
             End = new QuestTime(stream);
@@ -56,7 +57,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
         public int SNOQuest { get; private set; }
         public int StepID { get; private set; }
 
-        public QuestTime(MpqFileStream stream)
+        public QuestTime(Stream stream)
         {
             SNOQuest = stream.ReadValueS32();
             StepID = stream.ReadValueS32();
