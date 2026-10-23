@@ -58,6 +58,13 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 			return new Vector3D(position.X + xDelta, position.Y + yDelta, position.Z);
 		}
 
+		/// <summary>
+		/// Moves a position onto the walkable ground. Monster paths are worked out in 2D, so without this a monster
+		/// keeps the height it spawned at and ends up under or above the floor on slopes and stairs.
+		/// </summary>
+		public static Vector3D OnGround(MapSystem.World world, Vector3D position) =>
+			new(position.X, position.Y, world.GetZForLocation(position, position.Z));
+
 		public static List<Actor> GetUnitsOnPath(MapSystem.World world, Vector3D startPoint, Vector3D direction, float length, float thickness = 0f)
 		{
 			Vector3D beamEnd = PowerMath.TranslateDirection2D(startPoint, direction, startPoint, length);

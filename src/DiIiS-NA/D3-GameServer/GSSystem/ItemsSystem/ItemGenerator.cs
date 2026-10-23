@@ -1333,6 +1333,12 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 		public static Item CreateItem(ActorSystem.Actor owner, ItemTable definition, int forceQuality = -1,
 			bool crafted = false, int seed = -1, bool canBeUnidentified = true)
 		{
+			if (definition == null)
+			{
+				// e.g. no item matched a random-equip filter; a null here used to abort whole world generation
+				Logger.Warn("No item definition to create (owner {0}).", owner?.SNO);
+				return null;
+			}
 			Logger.Debug("Creating item: $[underline blue]${0}$[/]$ [sno:$[underline blue]${1}$[/]$, gbid $[underline blue]${2}$[/]$]", definition.Name, definition.SNOActor, StringHashHelper.HashItemName(definition.Name));
 
 			Type type = GetItemClass(definition);

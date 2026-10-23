@@ -130,6 +130,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Implementations
 		private void PopulateItems()
 		{
 			var items = GetVendorItems();
+			items.RemoveAll(item => item == null);
 			if (items.Count > _vendorGrid.Columns)
 			{
 				_vendorGrid.ResizeGrid(1, items.Count);

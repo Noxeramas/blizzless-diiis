@@ -2248,6 +2248,25 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 			{
 				AddBuff(User, new IceDomeBuff());
 			}
+			else
+			{
+				AimBeam();
+			}
+		}
+
+		/// <summary>
+		/// Points the beam at the first enemy in its path, or at full length. Done on every channel update, not only
+		/// on damage ticks, so the beam turns with the wizard instead of trailing behind for up to a tick.
+		/// </summary>
+		/// <returns>The enemy the beam hits, or null.</returns>
+		private Actor AimBeam()
+		{
+			var beamTargets = GetEnemiesInBeamDirection(User.Position, TargetPosition, MaxBeamLength, ScriptFormula(10));
+			var target = beamTargets.Actors.Count > 0 ? beamTargets.GetClosestTo(User.Position) : null;
+			_beamEnd?.MoveSnapped(target != null
+				? target.Position + new Vector3D(0, 0, 5f) // fix height for beam end
+				: _calcBeamEnd(MaxBeamLength), 0f);
+			return target;
 		}
 
 		public override IEnumerable<TickTimer> Main()
@@ -2269,21 +2288,9 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 			else
 			{
 				// Select first actor beam hits, or make max beam length
-				Vector3D attackPos;
-				var beamTargets = GetEnemiesInBeamDirection(User.Position, TargetPosition, MaxBeamLength, ScriptFormula(10));
-				if (beamTargets.Actors.Count > 0)
-				{
-					Actor target = beamTargets.GetClosestTo(User.Position);
-					attackPos = target.Position + new Vector3D(0, 0, 5f);  // fix height for beam end
+				var target = AimBeam();
+				if (target != null)
 					attack.Targets = GetEnemiesInRadius(target.Position, 5f);
-				}
-				else
-				{
-					attackPos = _calcBeamEnd(MaxBeamLength);
-				}
-
-				// update _beamEnd actor
-				_beamEnd.MoveSnapped(attackPos, 0f);
 
 				// all runes other than B seem to share the same weapon damage.
 				attack.AddWeaponDamage(ScriptFormula(0) * EffectsPerSecond * User.Attributes[GameAttributes.Attacks_Per_Second_Total], DamageType.Cold);

@@ -61,7 +61,11 @@ namespace DiIiS_NA.GameServer.MessageSystem
 		{
 			int id = buffer.ReadInt(10);
 			var msg = Allocate<GameMessage>((Opcodes)id);
-			if (msg == null) return null;
+			if (msg == null)
+			{
+				Logger.Warn("Received opcode {0} ({1}) with no message class; dropping the rest of its packet.", id, (Opcodes)id);
+				return null;
+			}
 
 			msg.Id = id;
 			msg.Parse(buffer);

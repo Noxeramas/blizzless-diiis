@@ -9,8 +9,8 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Definitions.Waypoint
     [Message(Opcodes.LastWaypointLevelAreaDataMessage, Consumers.Player)]
     public class LastWaypointLevelAreaDataMessage : GameMessage
     {
-        public int /* sno */ Field0;
-        public int Field1;
+        public int /* sno */ SNOLevelArea;
+        public int PlayerIndex;
 
         public LastWaypointLevelAreaDataMessage()
             : base(Opcodes.LastWaypointLevelAreaDataMessage)
@@ -18,14 +18,14 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Definitions.Waypoint
 
         public override void Parse(GameBitBuffer buffer)
         {
-            Field0 = buffer.ReadInt(32);
-            Field1 = buffer.ReadInt(32);
+            SNOLevelArea = buffer.ReadInt(32);
+            PlayerIndex = buffer.ReadInt(32);
         }
 
         public override void Encode(GameBitBuffer buffer)
         {
-            buffer.WriteInt(32, Field0);
-            buffer.WriteInt(32, Field1);
+            buffer.WriteInt(32, SNOLevelArea);
+            buffer.WriteInt(32, PlayerIndex);
         }
 
         public override void AsText(StringBuilder b, int pad)
@@ -34,8 +34,8 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Definitions.Waypoint
             b.AppendLine("LastWaypointLevelAreaDataMessage:");
             b.Append(' ', pad++);
             b.AppendLine("{");
-            b.Append(' ', pad); b.AppendLine("Field0: 0x" + Field0.ToString("X8") + " (" + Field0 + ")");
-            b.Append(' ', pad); b.AppendLine("Field1: 0x" + Field1.ToString("X8") + " (" + Field1 + ")");
+            b.Append(' ', pad); b.AppendLine("SNOLevelArea: 0x" + SNOLevelArea.ToString("X8") + " (" + SNOLevelArea + ")");
+            b.Append(' ', pad); b.AppendLine("PlayerIndex: 0x" + PlayerIndex.ToString("X8") + " (" + PlayerIndex + ")");
             b.Append(' ', --pad);
             b.AppendLine("}");
         }

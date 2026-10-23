@@ -801,6 +801,7 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 					}
 
 					Empty = false;
+					joinedPlayer.SendLastWaypointLevelArea();
 
 					foreach (var portal in StartingWorld.GetActorsBySNO(ActorSno._x1_openworld_lootrunportal,
 						         ActorSno._x1_openworld_tiered_rifts_portal,

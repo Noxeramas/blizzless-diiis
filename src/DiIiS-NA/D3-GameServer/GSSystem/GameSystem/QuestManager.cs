@@ -946,7 +946,8 @@ namespace DiIiS_NA.D3_GameServer.GSSystem.GameSystem
 					int monsterCount = 0;
 					foreach (var scene in QuestManager.Game.GetWorld(world).Scenes.Values)
 						if (!scene.SceneSNO.Name.ToLower().Contains("filler"))
-							if (scene.Specification.SNOLevelAreas[0] == LevelArea)
+							// the kill can be in an override level area, in a world without the bounty's own level area
+							if (scene.Specification.SNOLevelAreas[0] == LevelArea || scene.Specification.SNOLevelAreas[0] == levelArea)
 							{
 								scenes.Add(scene);
 								foreach (var act in scene.Actors)
@@ -964,19 +965,22 @@ namespace DiIiS_NA.D3_GameServer.GSSystem.GameSystem
 						Counter = AdditionalTargetCounter,
 						Checked = (AdditionalTargetNeed <= AdditionalTargetCounter) ? 1 : 0
 					});
-					if (monsterCount < AdditionalTargetCounter + 20)
+					if (monsterCount < AdditionalTargetCounter + 20 && scenes.Count > 0 &&
+					    GameServer.GSSystem.GeneratorsSystem.SpawnGenerator.Spawns.TryGetValue(LevelArea, out var spawns) && spawns.Melee.Count > 0)
 					{
 						while (monsterCount < AdditionalTargetCounter + 20)
 						{
 							GameServer.Core.Types.Math.Vector3D scenePoint = scenes.PickRandom().Position;
 							GameServer.Core.Types.Math.Vector3D point = null;
-							while (true)
+							// bounded so a scene without walkable ground can't hang the game loop
+							for (var attempt = 0; attempt < 50 && point == null; attempt++)
 							{
-								point = new GameServer.Core.Types.Math.Vector3D(scenePoint.X + RandomHelper.Next(0, 240), scenePoint.Y + RandomHelper.Next(0, 240), scenePoint.Z);
-								if (QuestManager.Game.GetWorld(world).CheckLocationForFlag(point, Scene.NavCellFlags.AllowWalk))
-									break;
+								var candidate = new GameServer.Core.Types.Math.Vector3D(scenePoint.X + RandomHelper.Next(0, 240), scenePoint.Y + RandomHelper.Next(0, 240), scenePoint.Z);
+								if (QuestManager.Game.GetWorld(world).CheckLocationForFlag(candidate, Scene.NavCellFlags.AllowWalk))
+									point = candidate;
 							}
-							QuestManager.Game.GetWorld(world).SpawnMonster((ActorSno)GameServer.GSSystem.GeneratorsSystem.SpawnGenerator.Spawns[LevelArea].Melee.PickRandom(), point);
+							if (point != null)
+								QuestManager.Game.GetWorld(world).SpawnMonster((ActorSno)spawns.Melee.PickRandom(), point);
 							monsterCount++;
 						}
 					} // Need additional monster spawn, there are few of them

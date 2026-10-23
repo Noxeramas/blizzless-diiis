@@ -76,6 +76,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 
 			if (!Stucked && Owner.WalkSpeed > 0f)
 			{
+				destPoint = MovementHelpers.OnGround(Owner.World, destPoint);
 				Owner.Move(destPoint, MovementHelpers.GetFacingAngle(Owner, destPoint));
 				var delay = (int)(MovementHelpers.GetDistance(Owner.Position, destPoint) / Owner.WalkSpeed);
 				_lastDelay = delay + (6 - (delay % 6));
@@ -91,7 +92,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 				{
 					if (!Stucked && Owner.WalkSpeed > 0f)
 					{
-						Owner.Position = MovementHelpers.GetMovementPosition(defaultPosition, Owner.WalkSpeed, MovementHelpers.GetFacingAngle(defaultPosition, destPoint), _lastDelay);
+						Owner.Position = MovementHelpers.OnGround(Owner.World, MovementHelpers.GetMovementPosition(defaultPosition, Owner.WalkSpeed, MovementHelpers.GetFacingAngle(defaultPosition, destPoint), _lastDelay));
 					}
 
 					if (Owner == null ||

@@ -115,6 +115,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 			//Vector3D destPoint = this._path.First();
 			if (!Stucked && Owner.WalkSpeed > 0f)
 			{
+				destPoint = MovementHelpers.OnGround(Owner.World, destPoint);
 				Owner.Move(destPoint, MovementHelpers.GetFacingAngle(Owner, destPoint));
 				_lastDelay = (int)(MovementHelpers.GetDistance(Owner.Position, destPoint) / (Owner.WalkSpeed));
 
@@ -131,7 +132,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 					if (Canceled) return;
 					if (!Stucked && Owner.WalkSpeed > 0f)
 					{
-						Owner.Position = MovementHelpers.GetMovementPosition(defaultPosition, Owner.WalkSpeed, MovementHelpers.GetFacingAngle(Owner.Position, destPoint), _lastDelay);
+						Owner.Position = MovementHelpers.OnGround(Owner.World, MovementHelpers.GetMovementPosition(defaultPosition, Owner.WalkSpeed, MovementHelpers.GetFacingAngle(Owner.Position, destPoint), _lastDelay));
 					}
 
 					if (Owner == null ||

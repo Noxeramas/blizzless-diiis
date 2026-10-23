@@ -72,14 +72,16 @@ namespace DiIiS_NA.GameServer.ClientSystem
 							while ((end - incomingBuffer.Position) >= 9 && Connection.IsOpen())
 							{
 								var message = incomingBuffer.ParseMessage();
-								//217
-								//
-								if (message == null) continue;
+								// Without a message class the message's length is unknown, so skip to the end of the packet;
+								// continuing would read its data as further messages.
+								if (message == null) break;
 								try
 								{
 									Logger.LogIncomingPacket(message); // change ConsoleTarget's level to Level.Dump in program.cs if u want to see messages on console.
 									if (message.Id is 96 or 369 or 269)
 										message.Consumer = Consumers.Inventory;
+									if (message.Id == (int)Opcodes.TeleportToWaypoint)
+										message.Consumer = Consumers.Player;
 									if (message.Consumer != Consumers.None)
 									{
 										if (message.Consumer == Consumers.ClientManager) ClientManager.Instance.Consume(this, message); // Client should be greeted by ClientManager and sent initial game-setup messages.

@@ -1508,7 +1508,9 @@ public class Player : Actor, IMessageConsumer, IUpdateable
         else if (message is UnassignSkillMessage unassignSkillMessage) OnUnassignActiveSkill(client, unassignSkillMessage);
         else if (message is TargetMessage targetMessage) OnObjectTargeted(client, targetMessage);
         else if (message is ACDClientTranslateMessage translateMessage) OnPlayerMovement(client, translateMessage);
-        else if (message is TryWaypointMessage waypointMessage) OnTryWaypoint(client, waypointMessage);
+        else if (message is TryWaypointMessage waypointMessage) TeleportToWaypoint(waypointMessage.nWaypoint);
+        else if (message is DWordDataMessage { Id: (int)Opcodes.TeleportToWaypoint } mapWaypointMessage)
+            TeleportToWaypoint(mapWaypointMessage.Field0); // picked on the map rather than at a waypoint
         else if (message is RequestBuyItemMessage itemMessage) OnRequestBuyItem(client, itemMessage);
         else if (message is RequestSellItemMessage sellItemMessage) OnRequestSellItem(client, sellItemMessage);
         else if (message is HirelingRequestLearnSkillMessage learnSkillMessage)
@@ -2737,10 +2739,10 @@ public class Player : Actor, IMessageConsumer, IUpdateable
         }), message.snoPower);
     }
 
-    private void OnTryWaypoint(GameClient client, TryWaypointMessage tryWaypointMessage)
+    private void TeleportToWaypoint(int waypointId)
     {
-        var wpWorld = World.Game.GetWayPointWorldById(tryWaypointMessage.nWaypoint);
-        var wayPoint = wpWorld.GetWayPointById(tryWaypointMessage.nWaypoint);
+        var wpWorld = World.Game.GetWayPointWorldById(waypointId);
+        var wayPoint = wpWorld?.GetWayPointById(waypointId);
         if (wayPoint == null) return;
         Logger.Debug("---Waypoint Debug---");
         var proximity = new RectangleF(wayPoint.Position.X - 1f, wayPoint.Position.Y - 1f, 2f, 2f);
@@ -2755,7 +2757,7 @@ public class Player : Actor, IMessageConsumer, IUpdateable
 
         var levelArea = scene.Specification.SNOLevelAreas[0];
         Logger.Debug(
-            $"OnTryWaypoint: Id: {tryWaypointMessage.nWaypoint}, WorldId: {wpWorld.SNO}, levelArea: {levelArea}");
+            $"TeleportToWaypoint: Id: {waypointId}, WorldId: {wpWorld.SNO}, levelArea: {levelArea}");
         Logger.Debug($"WpWorld: {wpWorld}, wayPoint: {wayPoint}");
         InGameClient.SendMessage(new SimpleMessage(Opcodes.LoadingWarping));
         if (wpWorld == World)
@@ -2786,7 +2788,27 @@ public class Player : Actor, IMessageConsumer, IUpdateable
             PlayerIndex = PlayerIndex,
             LevelAreaSNO = levelArea
         });
+        SendLastWaypointLevelArea(levelArea);
         Logger.Debug("---Waypoint Debug End---");
+    }
+
+    /// <summary>
+    /// Tells the client which level area the player last used a waypoint in. The map picks its act from this
+    /// level area's name, and the 2.8.0 client crashes opening the map if it was never sent.
+    /// </summary>
+    /// <param name="levelArea">The level area, or -1 for the waypoint in the player's current world.</param>
+    public void SendLastWaypointLevelArea(int levelArea = -1)
+    {
+        if (levelArea == -1)
+            levelArea = World?.Actors.Values.OfType<Waypoint>().FirstOrDefault(wp => wp.SNOLevelArea != -1)?.SNOLevelArea
+                        ?? CurrentScene?.Specification?.SNOLevelAreas[0] ?? -1;
+        if (levelArea == -1) return;
+
+        InGameClient.SendMessage(new LastWaypointLevelAreaDataMessage
+        {
+            SNOLevelArea = levelArea,
+            PlayerIndex = PlayerIndex
+        });
     }
 
     public void RefreshReveal()

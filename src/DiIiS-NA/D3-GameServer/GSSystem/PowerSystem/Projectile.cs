@@ -349,15 +349,15 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem
 				}
 			}
 
-			if (World != null)
-				_CheckCollisions();
-
-			// doing updates after collision tests
+			// move first, then test the path covered by this update; testing first lagged every hit by an update
 			if (World != null)
 			{
 				_prevUpdatePosition = Position;
 				_mover.Update();
 			}
+
+			if (World != null)
+				_CheckCollisions();
 
 			if (OnUpdate != null)
 				OnUpdate();

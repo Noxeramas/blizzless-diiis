@@ -59,6 +59,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Implementations
 
 		public void Die(Actor source = null)
 		{
+			if (World == null) return; // already destroyed by an earlier hit
 			base.OnTargeted(null, null);
 			if (haveDrop)
 			{

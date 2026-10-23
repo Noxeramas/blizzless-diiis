@@ -75,11 +75,12 @@ namespace DiIiS_NA.GameServer.GSSystem.GeneratorsSystem
 				{
 					LoadedLevelAreas.Add(levelAreaSNO);
 
-					// Load monsters for level area
-					foreach (var scene in _lazyLevelAreas[levelAreaSNO])
-					{
-						LoadMonstersLayout(world, levelAreaSNO, scene);
-					}
+					// Load monsters for level area; a level area can be marked lazy without having scenes in this game
+					if (_lazyLevelAreas.TryGetValue(levelAreaSNO, out var scenes))
+						foreach (var scene in scenes)
+						{
+							LoadMonstersLayout(world, levelAreaSNO, scene);
+						}
 				}
 		}
 
