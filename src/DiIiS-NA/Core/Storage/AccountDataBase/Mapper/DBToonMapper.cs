@@ -19,7 +19,7 @@ namespace DiIiS_NA.Core.Storage.AccountDataBase.Mapper
 			Map(e => e.StoneOfPortal);
 			Map(e => e.CreatedSeason);
 			Map(e => e.Experience);
-			Map(e => e.ParagonBonuses).CustomSqlType("Bytea");
+			Map(e => e.ParagonBonuses).CustomType<UShortArrayUserType>().CustomSqlType("Bytea");
 			Map(e => e.PvERating).Not.Nullable().Default("0");
 			Map(e => e.ChestsOpened).Not.Nullable().Default("0");
 			Map(e => e.EventsCompleted).Not.Nullable().Default("0");
