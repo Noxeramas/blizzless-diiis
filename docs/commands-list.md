@@ -20,6 +20,7 @@
 | Unlock Artisans command | `unlockart` | `!unlockart`             | Unlock all artisans for you in Campaign                        |
 | Platinum command        | `platinum`  | `!platinum 100`          | Platinum for you                                               |
 | Gold command            | `gold`      | `!gold 100`              | Gold for you?                                                  |
+| Materials command       | `materials` | `!materials 500`         | Adds that many of every crafting material (default 100)        |
 | Item command            | `item`      | `!item p71_ethereal_10`  | Get any Item by Name see the file items-identification-doc.md  |
 | Teleport command        | `tp`        | `!tp 71150`              | Teleport character to World by ID                              |
 | SpeedHack command       | `speed`     | `!speed 2`               | Increase you speed character                                   |
@@ -74,6 +75,8 @@ Optionally specify the number of levels: !levelup [count]
 ### !unlockart
 Unlock all artisans: !unlockart
 
+Optionally set the Blacksmith, Jeweler and Mystic to a level too, up to 12, skipping their training: !unlockart [level]
+
 ### !platinum
 Platinum for your character.
 
@@ -86,6 +89,12 @@ Upgrade Stash.
 Gold for your character.
 
 Optionally specify the number of gold: !gold [count]
+
+### !materials
+Adds every crafting material in the currency tab: Reusable Parts, Arcane Dust, Veiled Crystal, Death's Breath,
+Forgotten Souls, the act bounty materials and the Infernal Machine organs.
+
+Optionally specify the number of each (default 100): !materials [count]
 
 ### !achiplatinum
 Platinum for your character.

@@ -2946,6 +2946,50 @@ public class Player : Actor, IMessageConsumer, IUpdateable
         CurrentArtisan = null;
     }
 
+    /// <summary>
+    /// Sets the Blacksmith, Jeweler and Mystic to <paramref name="level"/> for this game's mode, skipping training
+    /// (<c>!unlockart [level]</c>). Call <see cref="LoadCrafterData"/> afterwards to send the new levels.
+    /// </summary>
+    public void SetArtisanLevel(int level)
+    {
+        if (_artisanTrainHelpers.Count == 0)
+            LoadCrafterData();
+
+        foreach (var trainHelper in _artisanTrainHelpers.Values)
+        {
+            trainHelper.DbRef.Level = Math.Clamp(level, 1, ArtisanTrainHelper.MaxLevel);
+            World.Game.GameDbSession.SessionUpdate(trainHelper.DbRef);
+        }
+    }
+
+    /// <summary>
+    /// The idle animation tag that shows <paramref name="type"/>'s workshop at this player's artisan level,
+    /// or null while that artisan is locked.
+    /// </summary>
+    internal int? GetArtisanWorkshopIdleTag(ArtisanType type)
+    {
+        var unlocked = InGameClient.Game.CurrentAct == 3000 || type switch
+        {
+            ArtisanType.Blacksmith => BlacksmithUnlocked,
+            ArtisanType.Jeweler => JewelerUnlocked,
+            ArtisanType.Mystic => MysticUnlocked,
+            _ => false
+        };
+        if (!unlocked || !_artisanTrainHelpers.TryGetValue(type, out var trainHelper))
+            return null;
+        return trainHelper.IdleAnimationTag;
+    }
+
+    /// <summary>
+    /// Shows the artisans' workshops this player can see at their current levels, after the levels changed
+    /// without training (training sends <see cref="CrafterLevelUpMessage"/>, which does this itself).
+    /// </summary>
+    public void UpdateArtisanWorkshops()
+    {
+        foreach (var workshop in World.Actors.Values.OfType<ArtisanWorkshop>())
+            workshop.UpdateLook(this);
+    }
+
     //*
     private void TrainArtisan(GameClient client, RequestTrainArtisanMessage message)
     {

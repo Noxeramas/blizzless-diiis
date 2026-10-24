@@ -8,7 +8,7 @@ namespace DiIiS_NA.D3_GameServer.GSSystem.PlayerSystem
 {
     internal class ArtisanTrainHelper
     {
-        private const int maxLevel = 12;
+        internal const int MaxLevel = 12;
         private static readonly ArtisanType[] canBeTrained = new[] { ArtisanType.Blacksmith, ArtisanType.Jeweler, ArtisanType.Mystic };
 
         private static readonly Dictionary<ArtisanType, string> recipeTemplates = new()
@@ -32,43 +32,11 @@ namespace DiIiS_NA.D3_GameServer.GSSystem.PlayerSystem
             [ArtisanType.Mystic] = 74987259424359
         };
 
-        // To'do it's necessary to get the correct Animation for Lvl 11 and 12.
-        // For now I'm just using the Lvl 10 Animation.
-        // fixme no animation level 11
-        // 0x00011600,
-        // fixme no animation level 12
-        // 0x00011610,
-        private static readonly int[] animationTags = new[] {
-            0x00011500,
-            0x00011510,
-            0x00011520,
-            0x00011530,
-            0x00011540,
-            0x00011550,
-            0x00011560,
-            0x00011570,
-            0x00011580,
-            0x00011590
-        };
-
-        // To'do it's necessary to get the correct Animation for Lvl 11 and 12.
-        // For now I'm just using the Lvl 10 Animation.
-        // fixme no animation level 11
-        // 0x00011310,
-        // fixme no animation level 12
-        // 0x00011320
-        private static readonly int[] idleAnimationTags = new[] {
-            0x00011210,
-            0x00011220,
-            0x00011230,
-            0x00011240,
-            0x00011250,
-            0x00011260,
-            0x00011270,
-            0x00011280,
-            0x00011290,
-            0x00011300
-        };
+        // Tags in the workshop's anim set (Blacksmith_Crafting_Backbone etc.), one per level and 0x10 apart:
+        // the transition that builds the workshop up to a level, and the idle look at that level.
+        // Levels 11 and 12 look like level 10.
+        private const int firstTransitionTag = 0x00011500;
+        private const int firstIdleTag = 0x00011210;
 
         private readonly ArtisanType artisanType;
 
@@ -83,9 +51,9 @@ namespace DiIiS_NA.D3_GameServer.GSSystem.PlayerSystem
 
         internal DBCraft DbRef { get; }
 
-        internal string TrainRecipeName => string.Format(recipeTemplates[artisanType], Math.Min(DbRef.Level, maxLevel - 1));
+        internal string TrainRecipeName => string.Format(recipeTemplates[artisanType], Math.Min(DbRef.Level, MaxLevel - 1));
 
-        internal bool HasMaxLevel => DbRef.Level >= maxLevel;
+        internal bool HasMaxLevel => DbRef.Level >= MaxLevel;
 
         internal ulong? Achievement => DbRef.Level switch
         {
@@ -96,27 +64,9 @@ namespace DiIiS_NA.D3_GameServer.GSSystem.PlayerSystem
 
         internal ulong? Criteria => DbRef.Level == 10 ? (ulong)criteriaForLevel10[artisanType] : null;
 
-        internal int AnimationTag
-        {
-            get
-            {
-                if (DbRef.Level >= 10)
-                    return animationTags[9]; // Force to use the LVL 10 Animation.
+        internal int AnimationTag => firstTransitionTag + 0x10 * (Math.Clamp(DbRef.Level, 1, MaxLevel) - 1);
 
-                return animationTags[DbRef.Level - 1];
-            }
-        }
-
-        internal int IdleAnimationTag
-        {
-            get
-            {
-                if (DbRef.Level >= 10)
-                    return idleAnimationTags[9]; // Force to use the LVL 10 Idle Animation.
-
-                return idleAnimationTags[DbRef.Level - 1];
-            }
-        }
+        internal int IdleAnimationTag => firstIdleTag + 0x10 * (Math.Clamp(DbRef.Level, 1, MaxLevel) - 1);
 
         internal int Type => Array.IndexOf(canBeTrained, artisanType);
     }

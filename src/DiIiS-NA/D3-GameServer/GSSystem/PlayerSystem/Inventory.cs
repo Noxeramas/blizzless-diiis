@@ -108,7 +108,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
             if (player != null && gBid == 2087837753)
             {
                 var playerAcc = player.InGameClient.BnetClient.Account.GameAccount;
-                return playerAcc.CraftItem4 > count;
+                return playerAcc.CraftItem4 >= count;
             }
 
             return (_inventoryGrid.TotalItemCount(gBid) + _stashGrid.TotalItemCount(gBid)) >= count;
@@ -1125,7 +1125,8 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 			else if (message is InventoryUseIdentifyItemMessage itemMessage) OnInventoryUseIdentifyItemMessage(itemMessage);
 			else if (message is TrySalvageMessage salvageMessage) OnTrySalvageMessage(salvageMessage);
 			else if (message is TrySalvageAllMessage allMessage) OnTrySalvageAllMessage(allMessage);
-			else if (message is CraftItemsMessage itemsMessage) OnCraftItemMessage(client, itemsMessage);
+			else if (message is CraftItemsMessage itemsMessage) CraftRecipe(client, itemsMessage.GBIDRecipe, itemsMessage.Count);
+			else if (message is GBIDDataMessage { Id: (int)Opcodes.CraftItemMessage } craftMessage) CraftRecipe(client, craftMessage.Field0, 1);
 			else if (message is EnchantAffixMessage affixMessage) OnEnchantAffixMessage(client, affixMessage);
 			else if (message is TryTransmogItemMessage transmogItemMessage) OnTryTransmogItemMessage(client, transmogItemMessage);
 			else if (message is DyeItemMessage dyeItemMessage) OnDyeItemMessage(client, dyeItemMessage);
@@ -1697,107 +1698,124 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 		private bool _achievementGranted = false;
 		private bool _radiantAchievementGranted = false;
 		//*
-		private void OnCraftItemMessage(GameClient client, CraftItemsMessage msg)
+		// Crafting materials that are kept in the currency tab instead of the inventory, by item name.
+		internal static readonly Dictionary<string, (Func<GameAccount, int> Get, Action<GameAccount, int> Set)> CraftingCurrencies = new()
 		{
-			var recipeGBId = msg.GBIDRecipe;
+			["Crafting_AssortedParts_01"] = (a => a.CraftItem1, (a, v) => a.CraftItem1 = v), // Reusable Parts
+			["Crafting_Magic_01"] = (a => a.CraftItem2, (a, v) => a.CraftItem2 = v), // Arcane Dust
+			["Crafting_Rare_01"] = (a => a.CraftItem3, (a, v) => a.CraftItem3 = v), // Veiled Crystal
+			["Crafting_Looted_Reagent_01"] = (a => a.CraftItem4, (a, v) => a.CraftItem4 = v), // Death's Breath
+			["Crafting_Legendary_01"] = (a => a.CraftItem5, (a, v) => a.CraftItem5 = v), // Forgotten Soul
+			["p2_ActBountyReagent_01"] = (a => a.HoradricA1Res, (a, v) => a.HoradricA1Res = v), // Khanduran Rune
+			["p2_ActBountyReagent_02"] = (a => a.HoradricA2Res, (a, v) => a.HoradricA2Res = v), // Caldeum Nightshade
+			["p2_ActBountyReagent_03"] = (a => a.HoradricA3Res, (a, v) => a.HoradricA3Res = v), // Arreat War Tapestry
+			["p2_ActBountyReagent_04"] = (a => a.HoradricA4Res, (a, v) => a.HoradricA4Res = v), // Corrupted Angel Flesh
+			["p2_ActBountyReagent_05"] = (a => a.HoradricA5Res, (a, v) => a.HoradricA5Res = v), // Westmarch Holy Water
+			["DemonOrgan_SkeletonKing_x1"] = (a => a.LeorikKey, (a, v) => a.LeorikKey = v), // Leoric's Regret
+			["DemonOrgan_Ghom_x1"] = (a => a.VialofPutridness, (a, v) => a.VialofPutridness = v),
+			["DemonOrgan_SiegeBreaker_x1"] = (a => a.IdolofTerror, (a, v) => a.IdolofTerror = v),
+			["DemonOrgan_Diablo_x1"] = (a => a.HeartofFright, (a, v) => a.HeartofFright = v), // Heart of Fright
+		};
+
+		// Gems and other stackable rewards are capped by their stack size instead.
+		private const int MaxItemCraftsPerRequest = 100;
+
+		/// <summary>
+		/// Crafts a Blacksmith or Jeweler recipe up to <paramref name="count"/> times. Gold, materials (currency tab) and
+		/// ingredient items (backpack, then stash) are checked before anything is taken, and crafting stops early when
+		/// they run out or the backpack is full.
+		/// </summary>
+		private void CraftRecipe(GameClient client, int recipeGBId, int count)
+		{
 			var recipeDefinition = ItemGenerator.GetRecipeDefinition(recipeGBId);
-			//if (!this._owner.RecipeAvailable(recipeDefinition)) return;
-			var recipe = (Recipe)MPQStorage.Data.Assets[SNOGroup.Recipe][recipeDefinition.SNORecipe].Data;
-			var extraAffixCount = recipe.ItemSpecifierData.AdditionalRandomAffixes + FastRandom.Instance.Next(0, recipe.ItemSpecifierData.AdditionalRandomAffixesDelta);
-
-			Item reward = ItemGenerator.CookFromDefinition(_owner.World, ItemGenerator.GetItemDefinition(recipe.ItemSpecifierData.ItemGBId), Math.Min(extraAffixCount, 9), false, true);
-			reward.Attributes[GameAttributes.ItemStackQuantityLo] = 0;
-			if (!Item.IsAmulet(reward.ItemType) && !Item.IsRing(reward.ItemType))
+			var recipe = recipeDefinition != null && MPQStorage.Data.Assets[SNOGroup.Recipe].TryGetValue(recipeDefinition.SNORecipe, out var asset)
+				? asset.Data as Recipe
+				: null;
+			var rewardDefinition = recipe == null ? null : ItemGenerator.GetItemDefinition(recipe.ItemSpecifierData.ItemGBId);
+			if (rewardDefinition == null)
 			{
-				if (reward.ItemLevel >= 70)
-					_owner.GrantCriteria(74987254004798);
-			}
-			else
-			{
-				if (reward.ItemLevel >= 70)
-					_owner.GrantCriteria(74987254245219);
+				Logger.Warn("Craft request for recipe {0} ({1}), which has no item to craft.", recipeGBId, recipeDefinition?.Name ?? "unknown");
+				return;
 			}
 
-			if (GetGoldAmount() < recipeDefinition.Gold) return;
-			bool haveEnoughIngredients = true;
+			var stackable = rewardDefinition.MaxStackSize > 1;
+			count = Math.Clamp(count, 1, stackable ? rewardDefinition.MaxStackSize : MaxItemCraftsPerRequest);
+			Logger.Debug("Crafting {0} x{1}.", recipeDefinition.Name, count);
 
-			foreach (var ingr in recipeDefinition.Ingredients)
+			Item result = null;
+			var crafted = 0;
+			for (; crafted < count && HasIngredients(recipeDefinition); crafted++)
 			{
-				if (ingr.ItemsGBID == -1 || ingr.ItemsGBID == 0) continue;
-				switch (ingr.ItemsGBID)
+				if (stackable)
 				{
-					case -363607620: // Common parts.
-						if (_owner.Toon.GameAccount.CraftItem1 < ingr.Count)
-							haveEnoughIngredients = false;
-						break;
-					case -1585802162: // Wizard Dust.
-						if (_owner.Toon.GameAccount.CraftItem2 < ingr.Count)
-							haveEnoughIngredients = false;
-						break;
-					case -605947593: // Blurred Crystal.
-						if (_owner.Toon.GameAccount.CraftItem3 < ingr.Count)
-							haveEnoughIngredients = false;
-						break;
+					TakeIngredients(recipeDefinition); // the stack is created once, after the loop
+					continue;
 				}
-				if (Item.IsGem(reward.ItemType))
-				{
-					Item FoundedItem = null;
-					foreach (var item in GetBackPackItems())
-						if (item.ItemDefinition.Hash == ingr.ItemsGBID)
-						{
-							FoundedItem = item;
-							if (FoundedItem.Attributes[GameAttributes.ItemStackQuantityLo] == ingr.Count)
-							{
-								_inventoryGrid.RemoveItem(FoundedItem);
-								FoundedItem.Unreveal(FoundedItem.Owner as Player);
-							}
-							else if (FoundedItem.Attributes[GameAttributes.ItemStackQuantityLo] > ingr.Count)
-							{
-								FoundedItem.Attributes[GameAttributes.ItemStackQuantityLo] -= ingr.Count;
-								FoundedItem.Attributes.BroadcastChangedIfRevealed();
-							}
-							else
-								return;
-						}
-					if (FoundedItem == null)
-						foreach (var item in GetStashItems())
-							if (item.ItemDefinition.Hash == ingr.ItemsGBID)
-							{
-								if (item.Attributes[GameAttributes.ItemStackQuantityLo] == ingr.Count)
-								{
-									_stashGrid.RemoveItem(item);
-									item.Unreveal(item.Owner as Player);
-								}
-								else if (item.Attributes[GameAttributes.ItemStackQuantityLo] > ingr.Count)
-								{
-									item.Attributes[GameAttributes.ItemStackQuantityLo] -= ingr.Count;
-									item.Attributes.BroadcastChangedIfRevealed();
-								}
-								else
-									return;
-							}
 
-				}
+				var item = CreateCraftedItem(recipeDefinition, recipe, rewardDefinition);
+				if (!_inventoryGrid.HasFreeSpace(item)) break;
+				TakeIngredients(recipeDefinition);
+				_inventoryGrid.AddItem(item);
+				GrantCraftingCriteria(item);
+				result = item;
 			}
-			if (!haveEnoughIngredients) return;
 
-			foreach (var ingr in recipeDefinition.Ingredients)
+			if (crafted == 0)
 			{
-				if (ingr.ItemsGBID == -1 || ingr.ItemsGBID == 0) continue;
-				switch (ingr.ItemsGBID)
-				{
-					case -363607620: // Common parts.
-						_owner.Toon.GameAccount.CraftItem1 -= ingr.Count;
-						break;
-					case -1585802162: // Wizard Dust.
-						_owner.Toon.GameAccount.CraftItem2 -= ingr.Count;
-						break;
-					case -605947593: // Blurred Crystal.
-						_owner.Toon.GameAccount.CraftItem3 -= ingr.Count;
-						break;
-				}
+				Logger.Debug("Couldn't craft {0}: not enough gold or materials, or no backpack space.", recipeDefinition.Name);
+				return;
+			}
+
+			if (stackable)
+			{
+				result = CreateCraftedItem(recipeDefinition, recipe, rewardDefinition);
+				result.Attributes[GameAttributes.ItemStackQuantityLo] = crafted;
+				_inventoryGrid.AddItem(result);
+				GrantCraftingCriteria(result);
+				if (!_inventoryGrid.Contains(result)) // merged into a stack the backpack already had
+					result = FindSameItems(result.GBHandle.GBID).FirstOrDefault() ?? result;
+			}
+
+			_owner.UpdateQuantity(74987243307366, (uint)crafted);
+			_owner.UpdateQuantity(74987243307371, (uint)crafted);
+			_owner.UpdateQuantity(74987243307374, (uint)crafted);
+
+			client.SendMessage(new CraftingResultsMessage { annItem = result.GlobalID, GBIDItem = recipe.ItemSpecifierData.ItemGBId, IQL = result.Attributes[GameAttributes.Item_Quality_Level] });
+			UpdateCurrencies();
+		}
+
+		private int CountIngredient(RecipeIngredient ingredient)
+		{
+			var name = ItemGenerator.GetItemDefinition(ingredient.ItemsGBID)?.Name;
+			if (name != null && CraftingCurrencies.TryGetValue(name, out var currency))
+				return currency.Get(_owner.Toon.GameAccount);
+			return _inventoryGrid.TotalItemCount(ingredient.ItemsGBID) + _stashGrid.TotalItemCount(ingredient.ItemsGBID);
+		}
+
+		private static bool IsUsedIngredient(RecipeIngredient ingredient) =>
+			ingredient.ItemsGBID != 0 && ingredient.ItemsGBID != -1 && ingredient.Count > 0;
+
+		private bool HasIngredients(RecipeTable recipeDefinition) =>
+			GetGoldAmount() >= recipeDefinition.Gold &&
+			recipeDefinition.Ingredients.Where(IsUsedIngredient).All(ingredient => CountIngredient(ingredient) >= ingredient.Count);
+
+		private void TakeIngredients(RecipeTable recipeDefinition)
+		{
+			foreach (var ingredient in recipeDefinition.Ingredients.Where(IsUsedIngredient))
+			{
+				var name = ItemGenerator.GetItemDefinition(ingredient.ItemsGBID)?.Name;
+				if (name != null && CraftingCurrencies.TryGetValue(name, out var currency))
+					currency.Set(_owner.Toon.GameAccount, currency.Get(_owner.Toon.GameAccount) - ingredient.Count);
+				else
+					GrabSomeItems(ingredient.ItemsGBID, ingredient.Count);
 			}
 			RemoveGoldAmount(recipeDefinition.Gold);
+		}
+
+		private Item CreateCraftedItem(RecipeTable recipeDefinition, Recipe recipe, ItemTable rewardDefinition)
+		{
+			var extraAffixCount = recipe.ItemSpecifierData.AdditionalRandomAffixes + FastRandom.Instance.Next(0, recipe.ItemSpecifierData.AdditionalRandomAffixesDelta);
+			var reward = ItemGenerator.CookFromDefinition(_owner.World, rewardDefinition, Math.Min(extraAffixCount, 9), false, true);
 
 			if (Item.IsGem(reward.ItemType))
 				reward.Attributes[GameAttributes.Item_Quality_Level] = 1;
@@ -1812,19 +1830,21 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 					AffixGenerator.Generate(reward, recipe.ItemSpecifierData.AdditionalRandomAffixes, true);
 					reward.Attributes[GameAttributes.Item_Quality_Level] = 9;
 				}
-				//else
 				if (!(recipeDefinition.Name.StartsWith("T12_") || recipeDefinition.Name.StartsWith("T11_")))
 					reward.Attributes[GameAttributes.Item_Quality_Level] = Math.Min(recipe.ItemSpecifierData.AdditionalRandomAffixes + 2, 9);
 				if (reward.Attributes[GameAttributes.Item_Quality_Level] < 9)
-				{
 					AffixGenerator.Generate(reward, recipe.ItemSpecifierData.AdditionalRandomAffixes, true);
-				}
-
-				//reward.Attributes[GameAttribute.IsCrafted] = true;
 			}
 			reward.Attributes[GameAttributes.IsCrafted] = true;
 			reward.Attributes[GameAttributes.Attachment_Handled_By_Client] = true;
-			reward.Attributes[GameAttributes.ItemStackQuantityLo]++;
+			reward.Attributes[GameAttributes.ItemStackQuantityLo] = 1;
+			return reward;
+		}
+
+		private void GrantCraftingCriteria(Item reward)
+		{
+			if (reward.ItemLevel >= 70)
+				_owner.GrantCriteria(Item.IsAmulet(reward.ItemType) || Item.IsRing(reward.ItemType) ? 74987254245219UL : 74987254004798UL);
 
 			if (Item.IsGem(reward.ItemType))
 			{
@@ -1931,17 +1951,6 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 				if (reward.Attributes[GameAttributes.Armor_Bonus_Item] > 0 || reward.Attributes[GameAttributes.Armor_Item_Percent] > 0)
 					_owner.GrantCriteria(74987243308968);
 			}
-
-			_owner.UpdateQuantity(74987243307366, 1);
-			_owner.UpdateQuantity(74987243307371, 1);
-			_owner.UpdateQuantity(74987243307374, 1);
-
-			if (reward.Attributes[GameAttributes.ItemStackQuantityLo] > 0)
-				_inventoryGrid.AddItem(reward);
-			client.SendMessage(new CraftingResultsMessage { annItem = reward.GlobalID, GBIDItem = recipe.ItemSpecifierData.ItemGBId, IQL = reward.Attributes[GameAttributes.Item_Quality_Level] });
-
-
-			UpdateCurrencies();
 		}
 
 		private void OnTryTransmogItemMessage(GameClient client, TryTransmogItemMessage msg)
