@@ -59,8 +59,8 @@ The default configuration can be found at [config.mods.json](https://github.com/
   },
   "Items": {
     "UnidentifiedDropChances": { // chances in % of a dropped item to be unidentified
-      "HighQuality": 30.0,
-      "NormalQuality": 5.0
+      "HighQuality": 100.0, // legendary and set items; live: 100
+      "NormalQuality": 0.0 // magic and rare items; live: 0
     }
   },
   "Minimap": {

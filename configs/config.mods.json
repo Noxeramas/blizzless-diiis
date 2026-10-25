@@ -44,8 +44,8 @@
   },
   "Items": {
     "UnidentifiedDropChances": {
-      "HighQuality": 30.0,
-      "NormalQuality": 5.0
+      "HighQuality": 100.0,
+      "NormalQuality": 0.0
     }
   },
   "Minimap": {

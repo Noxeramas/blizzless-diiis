@@ -95,8 +95,9 @@ public class ItemsConfig
 
 public class UnidentifiedDrop
 {
-    public float HighQuality { get; set; } = 30f;
-    public float NormalQuality { get; set; } = 5f;
+    // Live: every legendary and set item drops unidentified, magic and rare items never do.
+    public float HighQuality { get; set; } = 100f;
+    public float NormalQuality { get; set; } = 0f;
 }
 
 public class MinimapConfig

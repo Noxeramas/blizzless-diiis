@@ -1083,6 +1083,10 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 		// Embers and Angelic Crucibles. The server runs no season themes.
 		private const int SeasonThemeItemFlag = 0x4000000;
 
+		// ItemTable.Flags of cosmetic rewards, which never drop or come from gambling: season rewards (Conqueror's
+		// Shako), promo and anniversary items, transmogs.
+		private const int CosmeticItemFlag = 0x800000;
+
 		internal static int DropWeight(ItemTable definition) => definition.Massive0[0];
 
 		private static bool DropsFor(ItemTable definition, ToonClass toonClass) =>
@@ -1113,7 +1117,8 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 			var itemDefinition = GetRandom(AllowedItems.Values
 					.Where(def =>
 						//def.ItemLevel == owner.World.Game.InitialLevel //owner.Attributes[GameAttribute.Level]
-						def.ItemLevel >= Math.Max(Math.Min(level - 3, 60), 1)
+						// at 70 only level-70 bases, as on live (Ascended Crown, not Zischagge); every type has one
+						def.ItemLevel >= (level >= 70 ? 70 : Math.Max(Math.Min(level - 3, 60), 1))
 						&& def.ItemLevel <= Math.Min(level + 3, 73)
 
 						&& !ObsoleteItems.Contains(def.Hash) //obsolete 1.0.3 items
@@ -1339,6 +1344,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 			List<ItemTable> pool_filtered = pool.Where(it =>
 				it.SNOActor != -1 &&
 				it.WeaponDamageMin != 100.0f &&
+				(it.Flags & CosmeticItemFlag) == 0 &&
 				!it.Name.ToLower().Contains("lootrun") && //TieredLootrunKey
 				!it.Name.ToLower().Contains("gold") &&
 				!it.Name.ToLower().Contains("Retro") &&
@@ -1543,15 +1549,15 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 		}
 		
 		/// <summary>
-		/// Randomly sets unidentified flag on item.
-		/// If the item is unique, legendary, special or set, it will have <see cref="GameServerConfig.ChanceHighQualityUnidentified"/>% chance to be unidentified.
-		/// Otherwise, it will have <see cref="GameServerConfig.ChanceNormalUnidentified"/>% chance to be unidentified.
+		/// Randomly sets unidentified flag on item, by the quality it rolled: a legendary or set item has
+		/// <see cref="UnidentifiedDrop.HighQuality"/>% chance to be unidentified (100 by default: live's always are),
+		/// any other <see cref="UnidentifiedDrop.NormalQuality"/>% (0 by default: on live magic and rare items are
+		/// identified, since patch 2.0.1).
 		/// </summary>
 		/// <param name="item">The item to set the flag</param>
-		private static void RandomSetUnidentified(Item item) => item.Unidentified = 
-			FastRandom.Instance.Chance(item.Name.Contains("unique", StringComparison.InvariantCultureIgnoreCase) 
-			|| item.ItemDefinition.Quality is ItemTable.ItemQuality.Legendary or ItemTable.ItemQuality.Special or ItemTable.ItemQuality.Set 
-			? GameModsConfig.Instance.Items.UnidentifiedDropChances.HighQuality 
+		private static void RandomSetUnidentified(Item item) => item.Unidentified =
+			FastRandom.Instance.Chance(item.Attributes[GameAttributes.Item_Quality_Level] >= 9
+			? GameModsConfig.Instance.Items.UnidentifiedDropChances.HighQuality
 			: GameModsConfig.Instance.Items.UnidentifiedDropChances.NormalQuality);
 
 		// Allows cooking a custom item.

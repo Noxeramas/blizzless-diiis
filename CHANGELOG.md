@@ -127,6 +127,9 @@ Before this, only the cow portal worked. Everything else either kept your stuff 
   - Tiers match the item level.
   - CDR and area damage roll again.
 - Drops, Kadala and the cube all pull from the same pool.
+- Cosmetic rewards with no stats (Conqueror's Shako and the rest of that season set, Helm of the Hierarch) don't drop or come from gambling anymore.
+- Level 70 magic and rare items use level 70 bases only. Before, they could get level 60 to 65 bases with less armor or damage.
+- Magic and rare items are always identified, and legendary and set items always drop unidentified, like on live. Before, 5% of magic and rare items came unidentified, and only 30% of legendaries did. An existing `config.mods.json` keeps its old values, so set `UnidentifiedDropChances` to 100 and 0 there.
 
 ### GM commands
 
