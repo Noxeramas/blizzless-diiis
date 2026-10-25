@@ -6,6 +6,10 @@
 
 DiIiS is a fully-functional open-source local server for [Diablo III: Reaper of Souls](https://eu.diablo3.blizzard.com).
 
+## This fork
+
+This fork runs DiIiS with the current Battle.net client, 2.8.0.99920, on the `2.8.0-client` branch, and reads game data from your own Diablo III install. It's a work in progress. The [changelog](CHANGELOG.md) lists what has changed so far. For the 2.7.4 client, use [upstream DiIiS](https://github.com/blizzless/blizzless-diiis).
+
 # Disclaimer
 
 [Disclaimer and Project Philosophy](disclaimer.md).
@@ -46,7 +50,7 @@ To test the server, use the **_test-stable_** or **_community_** branch
 
 Each version of the client includes changes to structures, opcodes and attributes.
 
-The currently supported version of the client: **2.7.4.84161**
+The currently supported version of the client: **2.8.0.99920**, the current Battle.net version. The 2.7.4.84161 client works with upstream DiIiS, not with this branch.
 
 ## Server Deploying
 ### Prepare Database
@@ -58,10 +62,10 @@ The currently supported version of the client: **2.7.4.84161**
 
 #### Or using docker
 1. [Install docker](https://docs.docker.com/get-docker/)
-2. Run `docker-compose up` from root folder (here).
+2. Run `docker compose up -d db` from root folder (here). This starts only the database. The server runs on Windows (below), since it reads game data from your Diablo III install.
 
 ### Compile and run
-1. Install [.NET 7 SDK and runtime](https://dotnet.microsoft.com/en-us/download/dotnet/7.0) (just runtime, not asp.net or desktop)
+1. Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
 2. Go to the repo directory and compile the project using this command:
 ```shell
 dotnet publish ./src/DiIiS-NA/Blizzless.csproj --configuration Release --output ./publish
@@ -69,6 +73,8 @@ dotnet publish ./src/DiIiS-NA/Blizzless.csproj --configuration Release --output 
 3. __Skip this stage for local game__ Copy the [config.mods.json](https://github.com/blizzless/blizzless-diiis/blob/community/configs/config.mods.json) file to the folder, and modify however you want. A file will be generated automatically from the `config.ini` for now.
 4. Update your `config.ini` file on the published folder with your network's IP records (`BindIP` and `PublicIP`)
 5. Go to the publish folder, launch Blizzless executable, wait until server start - it creates a hierarchy.
+ - The server finds your Diablo III install by itself. If it's somewhere unusual, set `GameDataPath` under `[Storage]` in `config.ini`.
+ - On first start it creates its own login certificate in `%LOCALAPPDATA%\D3Offline`.
 6. Create user account(s) using console: `!account add Login Password Tag`
  - Example:
   - `!account add username@ YourPassword YourBattleTag`
@@ -100,37 +106,26 @@ Creates an account with Login `username@`, password `YourPassword` and BattleTag
 
 Do this for each client connecting to the server.
 
-1. Get [supported client](#supported-clients) D3 (2.7.4).
+1. Install Diablo III through the Battle.net app and let it update to the [supported client](#supported-clients).
 
-2. Install certificate [bnetserver.p12](src/DiIiS-NA/bnetserver.p12), password - `123` (the game verifies the CA root certificates).
+2. Start the server (see above) and leave it running.
 
-3. Setting up redirects client to your server:
+3. Run `play.bat` from the repo folder and click Yes on the Windows prompts: one to edit the hosts file each time, and one to trust the server's certificate the first time. It points the Battle.net login hosts at 127.0.0.1, sends Blizzard's telemetry and crash-report hosts nowhere, and starts the game with `-launch`.
 
-	**Method #1 - Hosts**
+4. Login to the game using your credentials.
 
-	  Add redirects to the `hosts` file (Windows - `%WinDir%\System32\drivers\etc\hosts`, Linux - `/etc/hosts`):  
-	  `127.0.0.1 us.actual.battle.net`  
-	  `127.0.0.1 eu.actual.battle.net`
-
-	  !After the modification the official Battle.Net application will not be able to connect to the server!
-
-	  **Method #2 - Modify main executable file**
-
-	  ```c
-	  // Find null-terminated string enum and rewrite with HexEditor to your IP server.
-	  eu.actual.battle.net/
-	  us.actual.battle.net/
-	  cn.actual.battle.net/
-	  kr.actual.battle.net/
-	  ```
-
-4. Launch client (`x64` or `x86`) with arguments `"Diablo III64.exe" -launch`
-
-5. Login to the game using your credentials.
+5. When you close the game, play.bat removes the redirect, so the Battle.net app works normally again. `play.bat -Undo` also removes the certificate.
 
 6. [Skip this stage for local game] After that, when creating a game (in client), indicate the creation of a public game. Other players, when connecting, must also indicate a public game, and at the start they will connect to you.
 
 7. You're in the game world!
+
+To do it by hand instead of with play.bat:
+- Trust `%LOCALAPPDATA%\D3Offline\D3Offline-LocalCA.cer` (made by the server on first start) under Current User > Trusted Root Certification Authorities.
+- Add these lines to `%WinDir%\System32\drivers\etc\hosts`. The official Battle.net app can't connect while they're there.  
+  `127.0.0.1 us.actual.battle.net`  
+  `127.0.0.1 eu.actual.battle.net`
+- Launch `"Diablo III64.exe" -launch` from the game's `x64` folder.
 
 # Server Configuration
 
