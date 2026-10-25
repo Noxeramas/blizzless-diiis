@@ -75,6 +75,7 @@ dotnet publish ./src/DiIiS-NA/Blizzless.csproj --configuration Release --output 
 5. Go to the publish folder, launch Blizzless executable, wait until server start - it creates a hierarchy.
  - The server finds your Diablo III install by itself. If it's somewhere unusual, set `GameDataPath` under `[Storage]` in `config.ini`.
  - On first start it creates its own login certificate in `%LOCALAPPDATA%\D3Offline`.
+ - The database has to be running first. If the server stops with `Failed to connect to 127.0.0.1:5432`, start it with `docker compose up -d db`, or start PostgreSQL if you installed it yourself.
 6. Create user account(s) using console: `!account add Login Password Tag`
  - Example:
   - `!account add username@ YourPassword YourBattleTag`
