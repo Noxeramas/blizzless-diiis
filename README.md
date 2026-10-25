@@ -55,10 +55,17 @@ The currently supported version of the client: **2.8.0.99920**, the current Batt
 ## Server Deploying
 ### Prepare Database
 #### Manual
-1. Install [PostgreSQL 9.5.25](https://www.enterprisedb.com/downloads/postgres-postgresql-downloads).
-2. Create databases in PostgreSQL: `diiis` and `worlds`.
-3. Change you account and password in `database.Account.config` and `database.Worlds.conifg`.
-4. Restore `worlds.backup` to `worlds` database.
+1. Install [PostgreSQL](https://www.enterprisedb.com/downloads/postgres-postgresql-downloads). The Docker setup uses version 17. Remember the password you give the `postgres` user.
+2. Create two empty databases, `diiis` and `worlds`, with pgAdmin or from PostgreSQL's `bin` folder (`C:\Program Files\PostgreSQL\17\bin`):
+```shell
+createdb -U postgres diiis
+createdb -U postgres worlds
+```
+3. Restore `worlds.backup` into `worlds`. The server creates the tables in `diiis` itself on first start.
+```shell
+pg_restore -U postgres --clean --if-exists -d worlds src/DiIiS-NA/worlds.backup
+```
+4. If your `postgres` password isn't `postgres`, change it in `database.Account.config` and `database.Worlds.config`: in `src/DiIiS-NA` before you compile, or in the publish folder after.
 
 #### Or using docker
 1. [Install docker](https://docs.docker.com/get-docker/)
