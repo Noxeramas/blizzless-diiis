@@ -754,14 +754,22 @@ namespace DiIiS_NA.LoginServer.Toons
 		public GameDBSession DbSession { get; set; }
 
 		/// <summary>
-		/// Settings for toon.
+		/// The client's settings for this hero, such as the game mode it was last played in.
 		/// </summary>
-		private D3.Client.ToonSettings _settings = D3.Client.ToonSettings.CreateBuilder().Build();
-
 		public D3.Client.ToonSettings Settings
 		{
-			get => D3.Client.ToonSettings.CreateBuilder().SetUiFlags(0xFFFFFFFF).Build(); //this._settings;
-			set => _settings = value;
+			get => DbToon.Settings is { Length: > 0 }
+				? D3.Client.ToonSettings.ParseFrom(DbToon.Settings)
+				: D3.Client.ToonSettings.DefaultInstance;
+			set
+			{
+				lock (DbToon)
+				{
+					var dbToon = DbToon;
+					dbToon.Settings = value.ToByteArray();
+					DBSessions.SessionUpdate(dbToon);
+				}
+			}
 		}
 
 		/// <summary>

@@ -1183,7 +1183,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
                 WizardFrequency = stream.ReadValueS32();
                 WitchDoctorFrequency = stream.ReadValueS32();
                 MonkFrequency = stream.ReadValueS32();
-                CrafterRequiredLevel = stream.ReadValueS32();
+                CrusaderFrequency = stream.ReadValueS32();
                 NecromancerFrequency = stream.ReadValueS32();
                 HirelingNoneFrequency = stream.ReadValueS32();
                 TemplarFrequency = stream.ReadValueS32();
@@ -2607,6 +2607,8 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
                 Type = stream.ReadValueS32();
                 TypeValue = stream.ReadValueS32();
                 Quantity = stream.ReadValueS32();
+                if (GameDataFormat.IsInstalledGame)
+                    stream.Position += 8; // 2.8.0 adds two fields; ingredients are 20 bytes
             }
         }
         public class LootRunQuestTierEntry

@@ -33,6 +33,10 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 
 		public static readonly ConcurrentDictionary<int, ItemTable> AllowedUniqueItems = new();
 
+		// Each item's level in the game data: legendaries are scaled by overwriting ItemTable.ItemLevel with the level
+		// they're rolled at (see CreateLegendary).
+		private static readonly ConcurrentDictionary<int, int> DataLevels = new();
+
 		private static readonly ConcurrentDictionary<int, RecipeTable> Recipes = new();
 
 		private static readonly ConcurrentDictionary<int, ItemTable> Lore = new();
@@ -59,6 +63,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 			Logger.Info("Loading $[underline]$Items$[/]$...");
 			LoadRecipes();
 			LoadItems();
+			AddCurrentLegendaries();
 			Logger.Info("Loading $[underline]$Paragons$[/]$...");
 			LoadParagonBonuses();
 			//LoadAffixes(); //just for checking values
@@ -158,6 +163,54 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 			}
 		}
 
+		/// <summary>
+		/// Gives base stats to the legendaries that drop (<see cref="DropWeight"/>) but aren't in DiIiS's own table of
+		/// them (<see cref="UniqueItems.UniqueItemStats"/>), which lacks many current ones. Armor comes from the base
+		/// item, as that table has it. The table's weapon damage doesn't follow from the base items, so a weapon takes
+		/// the stats of an older version of itself (the same actor and item type).
+		/// </summary>
+		private static void AddCurrentLegendaries()
+		{
+			int armor = 0, weapons = 0;
+			var noStats = new List<string>();
+			foreach (var definition in Items.Values.Where(d => DropWeight(d) > 0 && !UniqueItems.UniqueItemStats.ContainsKey(d.Hash)).ToList())
+			{
+				var type = ItemGroup.FromHash(definition.ItemTypesGBID);
+				if (type == null)
+					continue;
+				if (Item.IsWeapon(type))
+				{
+					var older = Items.Values
+						.Where(d => d.SNOActor == definition.SNOActor && d.ItemTypesGBID == definition.ItemTypesGBID &&
+						            UniqueItems.UniqueItemStats.ContainsKey(d.Hash))
+						.OrderByDescending(d => d.ItemLevel == definition.ItemLevel)
+						.FirstOrDefault();
+					if (older == null)
+					{
+						noStats.Add(definition.Name);
+						continue;
+					}
+					UniqueItems.UniqueItemStats[definition.Hash] = UniqueItems.UniqueItemStats[older.Hash];
+					weapons++;
+				}
+				else if (Item.IsArmor(type) || Item.IsOffhand(type) || Item.IsAccessory(type))
+				{
+					UniqueItems.UniqueItemStats[definition.Hash] = new UniqueItems.UniqueItemLayout
+					{
+						Armor = Items.TryGetValue(definition.SNOBaseItem, out var baseItem) && baseItem.Armor > 0
+							? new List<float> { baseItem.Armor, baseItem.Armor + baseItem.ArmorDelta }
+							: new List<float> { 0f },
+						DPS = new List<float> { 0f },
+						WeaponDamageMin = new List<float> { 0f },
+						WeaponDamageMax = new List<float> { 0f }
+					};
+					armor++;
+				}
+			}
+			Logger.Info("Legendaries: {0} given their base item's armor, {1} weapons an older version's stats. No stats, so they don't drop: {2}.",
+				armor, weapons, string.Join(", ", noStats));
+		}
+
 		private static void LoadItems()
 		{
 			//Logger.Info("LoadItems()");
@@ -169,6 +222,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 					foreach (var itemDefinition in data.Item)
 					{
 						Items.TryAdd(itemDefinition.Hash, itemDefinition);
+						DataLevels.TryAdd(itemDefinition.Hash, itemDefinition.ItemLevel);
 
 						if (itemDefinition.Name.EndsWith("_104") && itemDefinition.Name.Count(i => Char.IsDigit(i)) > 4)
 						{
@@ -1012,6 +1066,34 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 
 		public static List<int> ObsoleteItems = new();
 
+		private const ItemFlags AnyClass = ItemFlags.Barbarian | ItemFlags.Wizard | ItemFlags.WitchDoctor | ItemFlags.DemonHunter |
+			ItemFlags.Monk | ItemFlags.Crusader | ItemFlags.Necromancer;
+
+		// ItemTable.Massive0 is the game's legendary drop table: the item's weight (0 if it doesn't drop at random), then
+		// whether it drops for each of these classes.
+		private static readonly ToonClass[] DropTableClasses =
+		{
+			ToonClass.DemonHunter, ToonClass.Barbarian, ToonClass.Wizard, ToonClass.WitchDoctor, ToonClass.Monk,
+			ToonClass.Crusader, ToonClass.Necromancer
+		};
+
+		private const int HardcoreOnlyItemFlag = 0x40000; // ItemTable.Flags (Ancestors' Grace)
+
+		// ItemTable.Flags of season theme items, which drop only during their season: soul shards, ethereals, Hellforge
+		// Embers and Angelic Crucibles. The server runs no season themes.
+		private const int SeasonThemeItemFlag = 0x4000000;
+
+		internal static int DropWeight(ItemTable definition) => definition.Massive0[0];
+
+		private static bool DropsFor(ItemTable definition, ToonClass toonClass) =>
+			toonClass == ToonClass.Unknown || definition.Massive0[1 + Array.IndexOf(DropTableClasses, toonClass)] != 0;
+
+		private static ItemTable PickByDropWeight(List<ItemTable> pool)
+		{
+			var roll = RandomHelper.Next(pool.Sum(DropWeight));
+			return pool.FirstOrDefault(definition => (roll -= DropWeight(definition)) < 0);
+		}
+
 		// generates a random equip item (for vendors)
 		public static Item GenerateRandomEquip(ActorSystem.Actor owner, int level, int minQuality = 1,
 			int maxQuality = -1, ItemTypeTable type = null, ToonClass ownerClass = ToonClass.Unknown,
@@ -1024,37 +1106,9 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 			if (maxQuality > -1)
 				quality = RandomHelper.Next(minQuality, maxQuality);
 
-			if (quality > 8) //Unique items level scaling
-			{
-				var legaDefinition = GetRandom(AllowedItems.Values
-						.Where(def =>
-							def.ItemLevel <= Math.Min(level + 2, 73)
-							&& !ObsoleteItems.Contains(def.Hash)
-							&& UniqueItems.UniqueItemStats.ContainsKey(def.Hash)
-							&& def.Quality != ItemTable.ItemQuality.Special
-							&& (type == null || ItemGroup.HierarchyToHashList(ItemGroup.FromHash(def.ItemTypesGBID)).Contains(type.Hash))
-							&& (quality > 2 || !ItemGroup.HierarchyToHashList(ItemGroup.FromHash(def.ItemTypesGBID)).Contains(-740765630)) //not jewelry
-							&& (ownerClass == ToonClass.Unknown || (ownerClass switch
-								{
-									ToonClass.Barbarian => ItemGroup.FromHash(def.ItemTypesGBID).Usable.HasFlag(ItemFlags.Barbarian),
-									ToonClass.Crusader => ItemGroup.FromHash(def.ItemTypesGBID).Usable.HasFlag(ItemFlags.Crusader),
-									ToonClass.Monk => ItemGroup.FromHash(def.ItemTypesGBID).Usable.HasFlag(ItemFlags.Monk),
-									ToonClass.Necromancer => ItemGroup.FromHash(def.ItemTypesGBID).Usable.HasFlag(ItemFlags.Necromancer),
-									ToonClass.Wizard => ItemGroup.FromHash(def.ItemTypesGBID).Usable.HasFlag(ItemFlags.Wizard),
-									ToonClass.DemonHunter => ItemGroup.FromHash(def.ItemTypesGBID).Usable.HasFlag(ItemFlags.DemonHunter),
-									_ => ownerClass != ToonClass.WitchDoctor || ItemGroup.FromHash(def.ItemTypesGBID).Usable.HasFlag(ItemFlags.WitchDoctor)
-								})
-							)
-						).ToList()
-					, (quality > 8));
-
-				legaDefinition.ItemLevel = level;
-				legaDefinition.RequiredLevel = level;
-				legaDefinition.CrafterRequiredLevel = level;
-				for (int i = 0; i < 6; i++)
-					legaDefinition.MaxAffixLevel[i] = level;
-				return CreateItem(owner, legaDefinition, quality, crafted, canBeUnidentified: canBeUnidentified);
-			}
+			if (quality > 8)
+				return CreateLegendary(owner, PickByDropWeight(LegendaryPool(level, type, ownerClass, (owner as Player)?.Toon.IsHardcore ?? false)),
+					level, ownerClass, quality, crafted, canBeUnidentified);
 
 			var itemDefinition = GetRandom(AllowedItems.Values
 					.Where(def =>
@@ -1083,7 +1137,120 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 				, false //(quality > 8)
 			);
 
-			return CreateItem(owner, itemDefinition, quality, crafted, canBeUnidentified: canBeUnidentified);
+			return CreateItemForClass(owner, itemDefinition, ownerClass, quality, crafted, canBeUnidentified);
+		}
+
+		// A legendary of a definition from LegendaryPool (none if it's null), scaled to level.
+		private static Item CreateLegendary(ActorSystem.Actor owner, ItemTable legaDefinition, int level, ToonClass ownerClass,
+			int quality, bool crafted = false, bool canBeUnidentified = true)
+		{
+			if (legaDefinition == null)
+				return null; // no legendary matched (e.g. of the requested type)
+
+			legaDefinition.ItemLevel = level;
+			legaDefinition.RequiredLevel = level;
+			legaDefinition.CrafterRequiredLevel = level;
+			for (int i = 0; i < 6; i++)
+				legaDefinition.MaxAffixLevel[i] = level;
+			return CreateItemForClass(owner, legaDefinition, ownerClass, quality, crafted, canBeUnidentified);
+		}
+
+		/// <summary>
+		/// The legendaries a level <paramref name="level"/> item of <paramref name="type"/> (any type if null) can roll
+		/// for <paramref name="ownerClass"/> (any class if Unknown), from the game's drop table as on live: what drops,
+		/// gambling and the cube choose from, by <see cref="DropWeight"/>. A <paramref name="gambled"/> legendary can be
+		/// of the player's level or below, or of level 16 or below at any level, as maxroll's gamble calculator has it.
+		/// </summary>
+		public static List<ItemTable> LegendaryPool(int level, ItemTypeTable type, ToonClass ownerClass, bool hardcore = false,
+			bool gambled = false) =>
+			Items.Values
+				.Where(def =>
+					DropWeight(def) > 0
+					&& DataLevels.GetValueOrDefault(def.Hash, def.ItemLevel) <= (gambled ? Math.Max(level, 16) : Math.Min(level + 2, 73))
+					&& UniqueItems.UniqueItemStats.ContainsKey(def.Hash)
+					&& (type == null || ItemGroup.HierarchyToHashList(ItemGroup.FromHash(def.ItemTypesGBID)).Contains(type.Hash))
+					&& DropsFor(def, ownerClass)
+					&& (hardcore || (def.Flags & HardcoreOnlyItemFlag) == 0)
+					&& (def.Flags & SeasonThemeItemFlag) == 0
+				).ToList();
+
+		private static readonly ToonClass[] PlayableClasses =
+		{
+			ToonClass.Barbarian, ToonClass.Crusader, ToonClass.DemonHunter, ToonClass.Monk, ToonClass.Necromancer,
+			ToonClass.WitchDoctor, ToonClass.Wizard
+		};
+
+		/// <summary>
+		/// The class an equipment drop rolls for (Smart Loot, as on live): the player's class 85% of the time, otherwise
+		/// one of the other six at random.
+		/// </summary>
+		public static ToonClass SmartLootClass(Player player)
+		{
+			if (RandomHelper.NextDouble() < 0.85)
+				return player.Toon.Class;
+			var others = PlayableClasses.Where(c => c != player.Toon.Class).ToList();
+			return others[RandomHelper.Next(others.Count)];
+		}
+
+		/// <summary>
+		/// The class an item of <paramref name="type"/> rolls for when <paramref name="player"/> gets it with no chance of
+		/// another class (gambling, Kanai's Cube): theirs, unless only other classes can use the type (a Mojo for a
+		/// Wizard), in which case one of those.
+		/// </summary>
+		public static ToonClass ClassFor(Player player, ItemTypeTable type)
+		{
+			if (type == null || type.Usable.HasFlag(ClassFlag(player.Toon.Class)))
+				return player.Toon.Class;
+			return PlayableClasses.FirstOrDefault(c => type.Usable.HasFlag(ClassFlag(c)), player.Toon.Class);
+		}
+
+		/// <summary>
+		/// The class a level <paramref name="level"/> legendary of <paramref name="type"/> rolls for when
+		/// <paramref name="player"/> gets one with no chance of another class (Kanai's Cube): <see cref="ClassFor"/>,
+		/// unless no legendary of the type drops for that class (a crossbow for a Wizard), in which case one of the
+		/// classes that can use the type and that one drops for, at random.
+		/// </summary>
+		public static ToonClass LegendaryClassFor(Player player, ItemTypeTable type, int level)
+		{
+			var toonClass = ClassFor(player, type);
+			bool HasLegendaries(ToonClass c) => LegendaryPool(level, type, c, player.Toon.IsHardcore).Count > 0;
+			if (HasLegendaries(toonClass))
+				return toonClass;
+			var others = PlayableClasses.Where(c => IsUsableBy(type, c) && HasLegendaries(c)).ToList();
+			return others.Count > 0 ? others[RandomHelper.Next(others.Count)] : toonClass;
+		}
+
+		public static bool IsUsableBy(ItemTypeTable type, ToonClass toonClass) =>
+			type != null && type.Usable.HasFlag(ClassFlag(toonClass));
+
+		private static ItemFlags ClassFlag(ToonClass toonClass) => toonClass switch
+		{
+			ToonClass.Barbarian => ItemFlags.Barbarian,
+			ToonClass.Crusader => ItemFlags.Crusader,
+			ToonClass.DemonHunter => ItemFlags.DemonHunter,
+			ToonClass.Monk => ItemFlags.Monk,
+			ToonClass.Necromancer => ItemFlags.Necromancer,
+			ToonClass.WitchDoctor => ItemFlags.WitchDoctor,
+			ToonClass.Wizard => ItemFlags.Wizard,
+			_ => AnyClass
+		};
+
+		/// <summary>
+		/// Creates an item whose affixes are <paramref name="ownerClass"/>'s (its primary stat, resource and skill
+		/// bonuses), as Smart Loot does. With no class, the primary stat is random and there are no class affixes.
+		/// </summary>
+		public static Item CreateItemForClass(ActorSystem.Actor owner, ItemTable definition, ToonClass ownerClass,
+			int forceQuality = -1, bool crafted = false, bool canBeUnidentified = true)
+		{
+			AffixGenerator.OwnerClass = ownerClass == ToonClass.Unknown ? null : ownerClass;
+			try
+			{
+				return CreateItem(owner, definition, forceQuality, crafted, canBeUnidentified: canBeUnidentified);
+			}
+			finally
+			{
+				AffixGenerator.OwnerClass = null;
+			}
 		}
 
 		// generates a random dye (for vendors)
@@ -1317,14 +1484,33 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 			return clonedItem;
 		}
 
-		public static Item GetRandomItemOfType(Player player, ItemTypeTable itemType, bool canBeUnidentified = true)
+		/// <summary>
+		/// A gambled item (Kadala) of one of <paramref name="itemTypes"/>, the types a mystery item covers (every
+		/// one-handed weapon type, or just Helm), as on live: legendary 10% of the time, picked by drop weight from all
+		/// the types' legendaries for the player's class together, so a type with none for it (a crossbow for a Wizard)
+		/// doesn't take the roll; otherwise magic or rare, of one of the types the class can use at random. Always for
+		/// the player's class, unless only other classes can use the types (see <see cref="ClassFor"/>).
+		/// </summary>
+		public static Item GetRandomItemOfType(Player player, IReadOnlyList<ItemTypeTable> itemTypes, bool canBeUnidentified = true)
 		{
-			int minQuality = 1;
-			if (ItemGroup.HierarchyToHashList(itemType).Contains(-740765630)) //jewelry
-				minQuality = 3;
-
-			Item item = GenerateRandomEquip(player, player.Level, minQuality, 10, itemType);
-			if (canBeUnidentified)
+			var usable = itemTypes.Where(type => IsUsableBy(type, player.Toon.Class)).ToList();
+			if (usable.Count == 0)
+				usable = itemTypes.ToList();
+			Item item = null;
+			if (RandomHelper.NextDouble() < 0.1)
+			{
+				var legaDefinition = PickByDropWeight(usable
+					.SelectMany(type => LegendaryPool(player.Level, type, ClassFor(player, type), player.Toon.IsHardcore, gambled: true))
+					.ToList());
+				if (legaDefinition != null)
+					item = CreateLegendary(player, legaDefinition, player.Level, ClassFor(player, ItemGroup.FromHash(legaDefinition.ItemTypesGBID)), 9);
+			}
+			if (item == null)
+			{
+				var type = RandomHelper.RandomItem(usable);
+				item = GenerateRandomEquip(player, player.Level, RandomHelper.Next(3, 9), type: type, ownerClass: ClassFor(player, type));
+			}
+			if (item != null && canBeUnidentified)
 				RandomSetUnidentified(item);
 			return item;
 		}

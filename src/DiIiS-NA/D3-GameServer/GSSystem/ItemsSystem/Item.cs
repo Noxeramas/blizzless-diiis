@@ -359,8 +359,16 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
             Owner.World.Game.GameDbSession.SessionUpdate(DBInventory);
             if (Owner is Player player)
             {
-                Unreveal(player);
-                Reveal(player);
+                // Update the item in place rather than revealing it again: the client plays the identify effect and
+                // sound when it sees the item change from unidentified.
+                if (AffixList.Count > 0)
+                    player.InGameClient.SendMessage(new AffixMessage()
+                    {
+                        ActorID = DynamicID(player),
+                        Field1 = 0x00000001,
+                        aAffixGBIDs = AffixList.Select(affix => affix.AffixGbid).ToArray()
+                    });
+                Attributes.SendChangedMessage(player.InGameClient);
                 if (ItemDefinition.Name.Contains("Unique"))
                 {
                     player.UniqueItemIdentified(DBInventory.Id);

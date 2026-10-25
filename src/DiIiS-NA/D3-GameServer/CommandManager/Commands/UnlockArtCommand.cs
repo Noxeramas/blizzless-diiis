@@ -26,6 +26,8 @@ public class UnlockArtCommand : CommandGroup
         player.GrantAchievement(74987243307766); // Blacksmith
         player.GrantAchievement(74987243307780); // Jeweler
         player.GrantAchievement(74987247205955); // Mystic
+        player.GrantCriteria(74987252674266); // Kanai's Cube found
+        player.KanaiUnlocked = true;
 
         player.HirelingTemplarUnlocked = true;
         player.InGameClient.SendMessage(new HirelingNewUnlocked() { NewClass = 1 });

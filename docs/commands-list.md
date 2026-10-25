@@ -21,6 +21,8 @@
 | Platinum command        | `platinum`  | `!platinum 100`          | Platinum for you                                               |
 | Gold command            | `gold`      | `!gold 100`              | Gold for you?                                                  |
 | Materials command       | `materials` | `!materials 500`         | Adds that many of every crafting material (default 100)        |
+| Blood shards command    | `shards`    | `!shards 500`            | Adds blood shards to gamble with Kadala (default 100)          |
+| Loot pool command       | `lootpool`  | `!lootpool Boots`        | Lists the legendaries an item type can roll for your class     |
 | Item command            | `item`      | `!item p71_ethereal_10`  | Get any Item by Name see the file items-identification-doc.md  |
 | Teleport command        | `tp`        | `!tp 71150`              | Teleport character to World by ID                              |
 | SpeedHack command       | `speed`     | `!speed 2`               | Increase you speed character                                   |
@@ -95,6 +97,18 @@ Adds every crafting material in the currency tab: Reusable Parts, Arcane Dust, V
 Forgotten Souls, the act bounty materials and the Infernal Machine organs.
 
 Optionally specify the number of each (default 100): !materials [count]
+
+### !shards
+Blood shards for your character, to gamble with Kadala.
+
+Optionally specify the number of shards (default 100): !shards [count]
+
+### !lootpool
+Lists the legendaries an item type can roll for your class and level: what drops, Kadala and Kanai's Cube choose
+from. The server log has the full list. From the server console, name the class (and optionally the level, 70 if not
+given).
+
+Usage: !lootpool <item type> [class] [level], for example !lootpool Boots, !lootpool ChestArmor or !lootpool Boots Wizard 70
 
 ### !achiplatinum
 Platinum for your character.

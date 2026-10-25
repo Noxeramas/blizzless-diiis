@@ -80,7 +80,7 @@ namespace DiIiS_NA.GameServer.ClientSystem
 									Logger.LogIncomingPacket(message); // change ConsoleTarget's level to Level.Dump in program.cs if u want to see messages on console.
 									if (message.Id is 96 or 369 or 269)
 										message.Consumer = Consumers.Inventory;
-									if (message.Id == (int)Opcodes.TeleportToWaypoint)
+									if (message.Id is (int)Opcodes.TeleportToWaypoint or (int)Opcodes.GambleMessage)
 										message.Consumer = Consumers.Player;
 									if (message.Consumer != Consumers.None)
 									{

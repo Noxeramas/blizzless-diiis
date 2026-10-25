@@ -1513,6 +1513,8 @@ public class Player : Actor, IMessageConsumer, IUpdateable
             TeleportToWaypoint(mapWaypointMessage.Field0); // picked on the map rather than at a waypoint
         else if (message is RequestBuyItemMessage itemMessage) OnRequestBuyItem(client, itemMessage);
         else if (message is RequestSellItemMessage sellItemMessage) OnRequestSellItem(client, sellItemMessage);
+        else if (message is GBIDDataMessage { Id: (int)Opcodes.GambleMessage } gambleMessage)
+            (SelectedNPC as Kadala)?.OnGamble(this, gambleMessage.Field0);
         else if (message is HirelingRequestLearnSkillMessage learnSkillMessage)
             OnHirelingRequestLearnSkill(client, learnSkillMessage);
         else if (message is HirelingRetrainMessage) OnHirelingRetrainMessage();
@@ -1691,70 +1693,8 @@ public class Player : Actor, IMessageConsumer, IUpdateable
         InGameClient.Game.CurrentEncounter.Activated = false;
     }
 
-    public void TransmuteItemsPlayer(GameClient client, TransmuteItemsMessage message)
-    {
-        var recipeDefinition = ItemGenerator.GetRecipeDefinition(608170752);
-        for (var i = 0; i < message.CurrenciesCount; i++)
-        {
-            var data = ItemGenerator.GetItemDefinition(message.GBIDCurrencies[i]).Name;
-            switch (data)
-            {
-                case "p2_ActBountyReagent_01": break;
-                case "p2_ActBountyReagent_02": break;
-                case "p2_ActBountyReagent_03": break;
-                case "p2_ActBountyReagent_04": break;
-                case "p2_ActBountyReagent_05": break;
-                case "Crafting_Looted_Reagent_01": break;
-            }
-        }
-
-        foreach (var it in message.annItems)
-        {
-            var a = Inventory.GetItemByDynId(this, (uint)it);
-        }
-
-        Item ItemPortalToCows = null;
-        var Items = new List<Item> { };
-        for (var i = 0; i < message.ItemsCount; i++)
-        {
-            Items.Add(Inventory.GetItemByDynId(this, (uint)message.annItems[i]));
-            if (Items[i].SNO == ActorSno._x1_polearm_norm_unique_05)
-                ItemPortalToCows = Items[i];
-        }
-
-        //Type - 0 - New property
-        //Type - 1 - Transmutation
-        //Type - 2 -
-
-        if (ItemPortalToCows != null)
-        {
-            InGameClient.SendMessage(new TransmuteResultsMessage()
-            {
-                annItem = -1,
-                Type = -1,
-                GBIDFakeItem = -1,
-                GBIDPower = -1,
-                FakeItemStackCount = -1
-            });
-
-            Inventory.DestroyInventoryItem(ItemPortalToCows);
-            World.SpawnMonster(ActorSno._p2_totallynotacowlevel_portal,
-                new Vector3D(Position.X + 5, Position.Y + 5, Position.Z));
-        }
-        else
-        {
-            InGameClient.SendMessage(new TransmuteResultsMessage()
-            {
-                annItem = (int)Items[0].DynamicID(this),
-                Type = 0,
-                GBIDFakeItem = -1,
-                GBIDPower = (int)Items[0].ItemDefinition.Hash,
-                FakeItemStackCount = -1
-            });
-            GrantCriteria(74987245494264);
-            GrantCriteria(74987258962046);
-        }
-    }
+    public void TransmuteItemsPlayer(GameClient client, TransmuteItemsMessage message) =>
+        KanaiCube.Transmute(this, message);
 
     private bool WaitToSpawn(TickTimer timer)
     {
@@ -2160,13 +2100,10 @@ public class Player : Actor, IMessageConsumer, IUpdateable
         // does not have to see them over and over...
         var index = ItemGenerator.Tutorials.IndexOf(message.SNOTutorial);
         if (index == -1) return;
-        var seenTutorials = Toon.GameAccount.DBGameAccount.SeenTutorials;
-        if (seenTutorials.Length <= 34)
-            seenTutorials = new byte[]
-            {
-                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-            };
+        // One bit per tutorial. Grow the saved bits when needed, keeping the ones already set.
+        var savedTutorials = Toon.GameAccount.DBGameAccount.SeenTutorials ?? Array.Empty<byte>();
+        var seenTutorials = new byte[Math.Max(savedTutorials.Length, Math.Max(34, ItemGenerator.Tutorials.Count / 8 + 1))];
+        savedTutorials.CopyTo(seenTutorials, 0);
         seenTutorials[index / 8] |= (byte)(1 << (index % 8));
 
         lock (Toon.GameAccount.DBGameAccount)
@@ -3099,6 +3036,18 @@ public class Player : Actor, IMessageConsumer, IUpdateable
         return true;
 
     }
+
+    /// <summary>
+    /// Adds the blood shards picked up since the last save to the account.
+    /// </summary>
+    public void SaveCollectedBloodShards()
+    {
+        if (BloodShardsCollectedTempCount <= 0) return;
+        Toon.GameAccount.BloodShards += BloodShardsCollectedTempCount;
+        Toon.GameAccount.TotalBloodShards += BloodShardsCollectedTempCount;
+        BloodShardsCollectedTempCount = 0;
+    }
+
     public void Update(int tickCounter)
     {
         if (BetweenWorlds) return;
@@ -3119,12 +3068,8 @@ public class Player : Actor, IMessageConsumer, IUpdateable
         }
 
         // Check the blood shards
-        if (InGameClient.Game.TickCounter % 120 == 0 && World != null && BloodShardsCollectedTempCount > 0)
-        {
-            Toon.GameAccount.BloodShards += BloodShardsCollectedTempCount;
-            Toon.GameAccount.TotalBloodShards += BloodShardsCollectedTempCount;
-            BloodShardsCollectedTempCount = 0;
-        }
+        if (InGameClient.Game.TickCounter % 120 == 0 && World != null)
+            SaveCollectedBloodShards();
 
         if (World != null && SkillSet.HasPassive(298038) && InGameClient.Game.TickCounter - LastMovementTick > 90)
             World.BuffManager.AddBuff(this, this, new UnwaveringWillBuff());
@@ -4944,6 +4889,18 @@ public class Player : Actor, IMessageConsumer, IUpdateable
         }
 
         Attributes.BroadcastChangedIfRevealed();
+    }
+
+    private const int ChannelAnimationTag = 0x68500; // the identify powers' animation; heroes' "recall_channel"
+
+    /// <summary>
+    /// Plays the hero's channel animation (the one town portal uses) for a cast the client doesn't start itself, such
+    /// as identifying an item.
+    /// </summary>
+    public void PlayChannelAnimation(int durationTicks)
+    {
+        if (AnimationSet != null && AnimationSet.Animations.TryGetValue(ChannelAnimationTag, out var animation))
+            PlayActionAnimation(animation, ticksToPlay: durationTicks);
     }
 
     public void StopCasting()

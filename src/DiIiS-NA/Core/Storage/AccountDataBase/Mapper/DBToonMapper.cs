@@ -38,6 +38,7 @@ namespace DiIiS_NA.Core.Storage.AccountDataBase.Mapper
 			Map(e => e.Name);
 			Map(e => e.TimePlayed);
 			Map(e => e.Lore).Nullable().Default("");
+			Map(e => e.Settings).CustomSqlType("Bytea");
 			Map(e => e.Archieved).Not.Nullable().Default("false");
 			Map(e => e.WingsActive).Not.Nullable().Default("-1");
 			Map(e => e.Cosmetic1);

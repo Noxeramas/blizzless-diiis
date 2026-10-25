@@ -54,7 +54,9 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Implementations.ScriptObjects
 			player.StartCasting(idDuration, new Action(() => {
 				foreach (var itm in player.Inventory.GetBackPackItems().Where(i => i.Unidentified))
 					itm.Identify();
-			}));
+				player.PlayEffectGroup(Inventory.IdentifySuccessEffectGroup);
+			}), Inventory.IdentifyAllWithCastPower);
+			player.PlayChannelAnimation(idDuration);
 
 			World.BroadcastIfRevealed(plr => new PlayAnimationMessage
 			{

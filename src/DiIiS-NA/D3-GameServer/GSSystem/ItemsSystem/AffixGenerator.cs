@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using DiIiS_NA.LoginServer.Toons;
 using DiIiS_NA.Core.Extensions;
 using DiIiS_NA.Core.Helpers.Math;
 using DiIiS_NA.Core.Logging;
@@ -22,6 +23,87 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 		public static List<AffixTable> AffixList = new List<AffixTable>();
 
 		private static List<AffixTable> LegendaryAffixList = new List<AffixTable>();
+
+		/// <summary>
+		/// The class the item being created is for (Smart Loot), or null for none. Its affixes are that class's, as on
+		/// live: its primary stat, resource and skill bonuses. Set around item creation by
+		/// <see cref="ItemGenerator.CreateItemForClass"/>.
+		/// </summary>
+		[ThreadStatic] internal static ToonClass? OwnerClass;
+
+		private static readonly (ToonClass Toon, ItemFlags Flag, Class Class)[] Classes =
+		{
+			(ToonClass.DemonHunter, ItemFlags.DemonHunter, Class.DemonHunter),
+			(ToonClass.Barbarian, ItemFlags.Barbarian, Class.Barbarian),
+			(ToonClass.Wizard, ItemFlags.Wizard, Class.Wizard),
+			(ToonClass.WitchDoctor, ItemFlags.WitchDoctor, Class.Witchdoctor),
+			(ToonClass.Monk, ItemFlags.Monk, Class.Monk),
+			(ToonClass.Crusader, ItemFlags.Crusader, Class.Crusader),
+			(ToonClass.Necromancer, ItemFlags.Necromancer, Class.Necromancer)
+		};
+
+		/// <summary>
+		/// The class whose affixes an item rolls: the one it's made for (<see cref="OwnerClass"/>), or else the only class
+		/// that can use its type (a wand), or none.
+		/// </summary>
+		private static Class AffixClass(Item item)
+		{
+			if (OwnerClass is { } owner)
+				return Classes.Where(c => c.Toon == owner).Select(c => c.Class).DefaultIfEmpty(Class.None).First();
+			var users = Classes.Where(c => item.ItemType.Usable.HasFlag(c.Flag)).ToList();
+			return users.Count == 1 ? users[0].Class : Class.None;
+		}
+
+		/// <summary>
+		/// Whether an affix rolls for a class: the affix's own class if it has one (skill bonuses, resources), and the
+		/// class's flag for it (Intelligence has none for a Barbarian). With no class, only affixes of no class roll.
+		/// </summary>
+		private static bool RollsFor(AffixTable affix, Class affixClass)
+		{
+			if (affixClass == Class.None)
+				return affix.PlayerClass == Class.None;
+			if (affix.PlayerClass != Class.None && affix.PlayerClass != affixClass)
+				return false;
+			return affixClass switch
+			{
+				Class.DemonHunter => affix.DemonHunterFrequency,
+				Class.Barbarian => affix.BarbarianFrequency,
+				Class.Wizard => affix.WizardFrequency,
+				Class.Witchdoctor => affix.WitchDoctorFrequency,
+				Class.Monk => affix.MonkFrequency,
+				Class.Crusader => affix.CrusaderFrequency,
+				_ => affix.NecromancerFrequency
+			} > 0;
+		}
+
+		// An affix's tiers each cover a range of item levels (a level 70 item rolls the 70-70 tier).
+		private static bool CoversLevel(AffixTable affix, int level) => affix.AffixLevelMin <= level && level <= affix.AffixLevelMax;
+
+		private const int SecondaryAffixGroup = 1; // AffixTable.AffixGroup: 0 for primary affixes, 1 for secondary ones
+
+		/// <summary>
+		/// Up to <paramref name="count"/> affixes from <paramref name="pool"/>, chosen by their Frequency as on live: one of
+		/// each family (AffixFamily0), at most one of each wider family (AffixFamily1, such as the primary stats), and none
+		/// of the families in <paramref name="taken"/>, which gains the families chosen.
+		/// </summary>
+		private static List<AffixTable> Roll(IEnumerable<AffixTable> pool, int count, HashSet<int> taken)
+		{
+			var rolled = new List<AffixTable>();
+			// a weighted shuffle: each affix comes first with a chance in proportion to its Frequency
+			foreach (var affix in pool.Where(a => a.Frequency > 0)
+				         .OrderByDescending(a => Math.Pow(RandomHelper.NextDouble(), 1.0 / a.Frequency)))
+			{
+				if (rolled.Count >= count)
+					break;
+				if (taken.Contains(affix.AffixFamily0) || (affix.AffixFamily1 != -1 && taken.Contains(affix.AffixFamily1)))
+					continue;
+				rolled.Add(affix);
+				taken.Add(affix.AffixFamily0);
+				if (affix.AffixFamily1 != -1)
+					taken.Add(affix.AffixFamily1);
+			}
+			return rolled;
+		}
 
 		static AffixGenerator()
 		{
@@ -51,8 +133,6 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 						if (affixDef.Name.Contains("DamConversionHeal")) continue; // not in game
 						if (affixDef.Name.Contains("CrushingBlow")) continue; // not in game
 						if (affixDef.Name.Contains("LifeS")) continue; // not in game
-						if (affixDef.Name.Contains("CooldownReduction")) continue; // not in game
-						if (affixDef.Name.Contains("SplashDamage")) continue; // not in game
 						if (affixDef.Name.Contains("1xx_Inferior")) continue;
 						//!a.Name.Contains("")
 
@@ -115,35 +195,35 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 
 			if (Item.IsAccessory(item.ItemType) && affixesCount <= 1) affixesCount = 2;
 
-			bool isUnique = item.ItemDefinition.Name.Contains("Unique_");
+			// Legendaries and set items (some have no "Unique_" in their names, like P6_Necro_Set_1_Boots)
+			bool isUnique = item.ItemDefinition.Name.Contains("Unique_") || item.Attributes[GameAttributes.Item_Quality_Level] >= 9;
+			bool isEthereal = item.ItemDefinition.Name.ToLower().Contains("p71_ethereal");
 
-			
-			if (isUnique && !isCrafting) affixesCount = item.ItemDefinition.BonusAffixes + item.ItemDefinition.BonusMajorAffixes + item.ItemDefinition.BonusMinorAffixes;
+			// As on live, a legendary rolls its fixed affixes (LegendaryAffixFamily), then as many random primary and
+			// secondary ones as its record says.
+			int primaryCount = 0, secondaryCount = 0;
+			if (isUnique && !isCrafting && !isEthereal)
+			{
+				primaryCount = item.ItemDefinition.BonusMajorAffixes;
+				secondaryCount = item.ItemDefinition.BonusMinorAffixes;
+				affixesCount = item.ItemDefinition.BonusAffixes;
+			}
 
-			if (item.ItemDefinition.Name.ToLower().Contains("p71_ethereal"))
+			if (isEthereal)
 			{
 				affixesCount = 8;
-				isUnique = true; 
+				isUnique = true;
 			}
 
 
 			if (item.GBHandle.GBID == -4139386) affixesCount = 6; //referral ring
-			if (isUnique)
-				affixesCount += 3;
 
-			Class itemPlayerClass = Class.None;
-			if (item.ItemType.Usable.HasFlag(ItemFlags.Barbarian)) itemPlayerClass = Class.Barbarian;
-			if (item.ItemType.Usable.HasFlag(ItemFlags.Crusader)) itemPlayerClass = Class.Crusader;
-			if (item.ItemType.Usable.HasFlag(ItemFlags.Necromancer)) itemPlayerClass = Class.Necromancer;
-			if (item.ItemType.Usable.HasFlag(ItemFlags.DemonHunter)) itemPlayerClass = Class.DemonHunter;
-			if (item.ItemType.Usable.HasFlag(ItemFlags.Wizard)) itemPlayerClass = Class.Wizard;
-			if (item.ItemType.Usable.HasFlag(ItemFlags.WitchDoctor)) itemPlayerClass = Class.Witchdoctor;
-			if (item.ItemType.Usable.HasFlag(ItemFlags.Monk)) itemPlayerClass = Class.Monk;
+			Class itemPlayerClass = AffixClass(item);
 
 
 			List<int> itemTypes = ItemGroup.HierarchyToHashList(item.ItemType);
 			//itemGroups.Add(ItemGroup.GetRootType(item.ItemType));
-			int levelToFind = (item.ItemLevel < 5 ? 0 : Math.Min(item.ItemLevel, 70));
+			int levelToFind = Math.Clamp(item.ItemLevel, 1, 70);
 			if (item.GBHandle.GBID == -4139386) levelToFind = 10;
 			if (itemTypes[0] == 828360981)
 				itemTypes.Add(-1028103400);
@@ -162,18 +242,30 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 			IEnumerable<AffixTable> filteredList = null;
 
 			filteredList = AllAffix.Where(a =>
-				(a.PlayerClass == itemPlayerClass || a.PlayerClass == Class.None) &&//(a.PlayerClass == ItemPlayerClass || a.PlayerClass == Class.None) &&
+				RollsFor(a, itemPlayerClass) &&
 				itemTypes.ContainsAtLeastOne(a.ItemGroup) &&
-				(a.AffixLevelMax >= levelToFind) &&
+				CoversLevel(a, levelToFind) &&
 				(a.OverrideLevelReq <= item.ItemDefinition.RequiredLevel)
 				//!a.Name.Contains("1xx_Inferior")
 				);
 
+			// Families the item already has, which random affixes don't repeat
+			var taken = new HashSet<int>(item.AffixFamilies);
 			if (isUnique)
 			{
 				var restrictedFamily = item.ItemDefinition.LegendaryAffixFamily.Where(af => af != -1).ToHashSet();
-				filteredList = filteredList
-					.Where(a => !(restrictedFamily.Contains(a.AffixFamily0) || restrictedFamily.Contains(a.AffixFamily1)));
+				for (int i = 0; i < 6; i++)
+				{
+					var fixedAffix = FindSuitableAffix(item, item.ItemDefinition.LegendaryAffixFamily[i], item.ItemDefinition.MaxAffixLevel[i], (item.ItemDefinition.I38[i] == 1));
+					AddAffix(item, fixedAffix, true);
+					if (AllAffix.FirstOrDefault(a => a.Hash == fixedAffix) is { } added)
+					{
+						taken.Add(added.AffixFamily0);
+						if (added.AffixFamily1 != -1)
+							taken.Add(added.AffixFamily1);
+					}
+				}
+				taken.UnionWith(restrictedFamily);
 
 				if (restrictedFamily.Contains(1616088365) ||
 				    restrictedFamily.Contains(-1461069734) ||
@@ -195,7 +287,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 				}
 			}
 
-			if (affixesCount <= 1)
+			if (!isUnique && affixesCount <= 1)
 				filteredList = filteredList.Where(
 					a =>
 					!a.Name.Contains("Secondary")
@@ -210,7 +302,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 					!a.Name.Contains("Vit")
 					);
 
-			if (affixesCount <= 3)
+			if (affixesCount + primaryCount + secondaryCount <= 3)
 				filteredList = filteredList.Where(
 					a =>
 					!a.Name.Contains("Experience") &&
@@ -219,23 +311,10 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 
 
 
-			Dictionary<int, AffixTable> bestDefinitions = new Dictionary<int, AffixTable>();
-
-			foreach (var affix_group in filteredList.GroupBy(a => a.AffixFamily0))
-			{
-				if (item.AffixFamilies.Contains(affix_group.First().AffixFamily0)) continue;
-				int s = item.ItemDefinition.RequiredLevel;
-
-				bestDefinitions[affix_group.First().AffixFamily0] = affix_group.PickRandom();
-			}
-
-			//if (bestDefinitions.Values.Where(a => a.Name.Contains("PoisonD")).Count() > 0) Logger.Debug("PoisonD in bestDefinitions");
-			List<AffixTable> selectedGroups = bestDefinitions.Values
-				.OrderBy(x => FastRandom.Instance.Next()) //random order
-				.GroupBy(x => (x.AffixFamily1 == -1) ? x.AffixFamily0 : x.AffixFamily1)
-				.Select(x => x.First()) //only one from group
-				.Take(affixesCount) //take needed amount
-				.ToList();
+			var pool = filteredList.ToList();
+			List<AffixTable> selectedGroups = Roll(pool.Where(a => a.AffixGroup != SecondaryAffixGroup), primaryCount, taken);
+			selectedGroups.AddRange(Roll(pool.Where(a => a.AffixGroup == SecondaryAffixGroup), secondaryCount, taken));
+			selectedGroups.AddRange(Roll(pool, affixesCount, taken));
 
 			int n = 0;
 			foreach (var def in selectedGroups)
@@ -305,42 +384,40 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 				}
 				n++;
 			}
-
-			if (isUnique)
-			{
-				for (int i = 0; i < 6; i++)
-				{
-					if (item.ItemDefinition.LegendaryAffixFamily[i] != -1)
-						AddAffix(item, FindSuitableAffix(item, item.ItemDefinition.LegendaryAffixFamily[i], item.ItemDefinition.MaxAffixLevel[i], (item.ItemDefinition.I38[i] == 1)));
-				}
-			}
 		}
 
+		/// <summary>
+		/// An affix of a legendary's fixed family <paramref name="affixGroup"/>: one for its item type (or, with
+		/// <paramref name="extendedFilter"/>, one meant for legendaries of the type), for the item's class, in the tier
+		/// for its level. (DiIiS looked these up in a list of affixes that the game data leaves empty, so legendaries
+		/// had none of them.)
+		/// </summary>
 		public static int FindSuitableAffix(Item item, int affixGroup, int affixLevel, bool extendedFilter)
 		{
 			if (affixGroup == -1) return -1;
-			var allGroup = LegendaryAffixList
+			List<int> itemTypes = ItemGroup.HierarchyToHashList(item.ItemType);
+			var allGroup = AllAffix
 				.Where(a => (a.AffixFamily0 == affixGroup || a.AffixFamily1 == affixGroup) && (Item.Is2H(item.ItemType) ? !a.Name.EndsWith("1h") : (!a.Name.Contains("Two-Handed") && !a.Name.EndsWith("2h"))))
+				.Where(a => itemTypes.ContainsAtLeastOne(a.ItemGroup) ||
+				            (extendedFilter && itemTypes.ContainsAtLeastOne(a.LegendaryAllowedTypes)))
 				.ToArray();
+			var affixClass = AffixClass(item);
+			var forClass = allGroup.Where(a => RollsFor(a, affixClass)).ToArray();
+			if (forClass.Any())
+				allGroup = forClass;
 
 			if (!allGroup.Any()) return -1;
 
-			bool secondGroup = allGroup.First().AffixFamily1 == affixGroup;
-
-			var suitable = allGroup.Where(a => a.AffixLevel <= affixLevel || affixLevel <= 0).ToArray();
-
-			if (!suitable.Any()) return -1;
-
-			List<int> itemTypes = ItemGroup.HierarchyToHashList(item.ItemType);
-
-			suitable = suitable.Where(a =>
-				itemTypes.ContainsAtLeastOne(a.ItemGroup) ||
-				(extendedFilter && itemTypes.ContainsAtLeastOne(a.LegendaryAllowedTypes))).ToArray();
-
-			if (!suitable.Any()) return -1;
-
-			int suitableAffixLevel = suitable.MaxBy(a => a.AffixLevel).AffixLevel;
-			suitable = suitable.Where(a => a.AffixLevel == suitableAffixLevel).ToArray();
+			// the tier for the item's level, or else the highest one below it
+			int level = Math.Clamp(Math.Max(affixLevel, item.ItemLevel), 1, 70);
+			var suitable = allGroup.Where(a => CoversLevel(a, level)).ToArray();
+			if (!suitable.Any())
+			{
+				var below = allGroup.Where(a => a.AffixLevelMin <= level).ToArray();
+				if (!below.Any()) return -1;
+				int top = below.Max(a => a.AffixLevelMax);
+				suitable = below.Where(a => a.AffixLevelMax == top).ToArray();
+			}
 
 			//if (i18 && !secondGroup)
 			//	suitable = suitable.Where(a => a.MaxLevel <= (Program.MaxLevel + 4));
@@ -348,9 +425,6 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 			//if (!ignoreItemTypeFilter)
 			//else
 			//suitable = suitable.Where(a => itemTypes.ContainsAtLeastOne(a.I10));
-
-			if (!suitable.Any())
-				suitable = allGroup.Where(a => a.AffixLevel == 1).ToArray();
 
 			/*int suitableMaxLevel = suitable.OrderByDescending(a => a.AffixLevel).First().MaxLevel;
 			int suitableAffixLevel = suitable.OrderByDescending(a => a.AffixLevel).First().AffixLevel;

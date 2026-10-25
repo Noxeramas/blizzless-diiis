@@ -35,6 +35,7 @@ namespace DiIiS_NA.Core.Storage.AccountDataBase.Entities
 		public virtual int TimePlayed { get; set; }
 		public virtual string Stats { get; set; }
 		public virtual byte[] Lore { get; set; }
+		public virtual byte[] Settings { get; set; }
 		public virtual bool Deleted { get; set; }
 		public virtual bool Archieved { get; set; }
 		public virtual int WingsActive { get; set; }

@@ -38,20 +38,23 @@ namespace DiIiS_NA.LoginServer.ServicesSystem.Services
             Init.SetOutstandingOrder(D3.Store.Order.CreateBuilder().SetAcknowledged(true).SetErrorCode(0).SetStatus(0)
                 .SetTransactionId(0));
 
-            var GAS = D3.Client.GameAccountSettings.CreateBuilder()
-                    .SetShowDifficultySelector(false)
-                    .SetUseGameHandicapDeprecated(true)
-                    .SetSeasonJourneySeasonNumber(10)
-                    .SetViewedAnniversaryScreenYear(1)
-                    .SetAccountFlags(0)
-                    .SetAccountFlags((uint)D3.Account.Digest.Types.Flags.MASTER_DIFFICULTY_UNLOCKED)
-                    .SetAchievementsTimeLastViewed(DateTimeExtensions.ToUnixTime(DateTime.UtcNow))
-                    //.SetViewedAnniversaryScreenYear(1)
-                    .SetViewedWhatsNewVersion(20)
-                    .SetViewedWhatsNewSeason(20)
+            // Start from the settings the client saved, so its choices carry over between logins, and fill in only what
+            // it hasn't saved.
+            var savedSettings = Client.Account.GameAccount.Settings;
+            var GAS = savedSettings.ToBuilder()
+                    .ClearHeroListOrder()
+                    .SetAccountFlags(savedSettings.AccountFlags | (uint)D3.Account.Digest.Types.Flags.MASTER_DIFFICULTY_UNLOCKED)
                     .SetRmtLastUsedCurrency("PLATINUM")
                     .SetRmtPreferredCurrency("PLATINUM")
                 ;
+            if (!savedSettings.HasShowDifficultySelector) GAS.SetShowDifficultySelector(false);
+            if (!savedSettings.HasUseGameHandicapDeprecated) GAS.SetUseGameHandicapDeprecated(true);
+            if (!savedSettings.HasSeasonJourneySeasonNumber) GAS.SetSeasonJourneySeasonNumber(10);
+            if (!savedSettings.HasViewedAnniversaryScreenYear) GAS.SetViewedAnniversaryScreenYear(1);
+            if (!savedSettings.HasAchievementsTimeLastViewed)
+                GAS.SetAchievementsTimeLastViewed(DateTimeExtensions.ToUnixTime(DateTime.UtcNow));
+            if (!savedSettings.HasViewedWhatsNewVersion) GAS.SetViewedWhatsNewVersion(20);
+            if (!savedSettings.HasViewedWhatsNewSeason) GAS.SetViewedWhatsNewSeason(20);
 
             //Client.Account.GameAccount.DBGameAccount.ViewedNewVersion = 8;
 
@@ -286,11 +289,10 @@ namespace DiIiS_NA.LoginServer.ServicesSystem.Services
                                 request.GetAttribute(2).Value.MessageValue);
                             attr.SetValue(Variant.CreateBuilder().SetMessageValue(toonSettings));
                             break;
-                        case 10: // SetToonSettings -> Empty Message???
-                            ByteString Current = GetAchievements(((HandlerController)controller).Client,
+                        case 10: // SetToonSettings -> Empty Message
+                            ByteString setToonSettings = OnSetToonSettings(((HandlerController)controller).Client,
                                 request.GetAttribute(2).Value.MessageValue);
-                            attr.SetValue(Variant.CreateBuilder().SetMessageValue(Current));
-                            // attr.SetValue(Variant.CreateBuilder().SetMessageValue(ByteString.Empty));
+                            attr.SetValue(Variant.CreateBuilder().SetMessageValue(setToonSettings));
                             break;
                         case 14: //D3.GameMessage.GetAccountProfiles
                             var getprofile1 = CollectProfiles(((HandlerController)controller).Client,
@@ -309,7 +311,12 @@ namespace DiIiS_NA.LoginServer.ServicesSystem.Services
                                 request.GetAttribute(2).Value.MessageValue);
                             attr.SetValue(Variant.CreateBuilder().SetMessageValue(prefs));
                             break;
-                        case 18: // 
+                        case 17: // SetAccountPrefs -> Empty Message
+                            ByteString setPrefs = OnSetAccountPrefs(((HandlerController)controller).Client,
+                                request.GetAttribute(2).Value.MessageValue);
+                            attr.SetValue(Variant.CreateBuilder().SetMessageValue(setPrefs));
+                            break;
+                        case 18: //
                             //ByteString TestNB = TestRequest(((HandlerController)controller).Client, request.GetAttribute(2).Value.MessageValue);
                             //attr.SetValue(Variant.CreateBuilder().SetMessageValue(TestNB));
                             break;
@@ -3002,8 +3009,32 @@ namespace DiIiS_NA.LoginServer.ServicesSystem.Services
         private ByteString OnGetToonSettings(BattleClient client, ByteString data)
         {
             var request = GetToonSettings.ParseFrom(data);
-            var response = D3.Client.ToonSettings.CreateBuilder();
-            return response.Build().ToByteString();
+            var toon = ToonManager.GetToonByLowId(request.HeroId);
+            if (toon == null || toon.GameAccount.PersistentID != client.Account.GameAccount.PersistentID)
+                return D3.Client.ToonSettings.DefaultInstance.ToByteString();
+            return toon.Settings.ToByteString();
+        }
+
+        /// <summary>
+        /// Saves the client's settings for a hero, which include the game mode it was last played in.
+        /// </summary>
+        private ByteString OnSetToonSettings(BattleClient client, ByteString data)
+        {
+            var request = SetToonSettings.ParseFrom(data);
+            var toon = ToonManager.GetToonByLowId(request.HeroId);
+            if (toon == null || toon.GameAccount.PersistentID != client.Account.GameAccount.PersistentID)
+                return ByteString.Empty;
+
+            // The client saves the mode only when a game starts. Its other saves (one at every login) leave it out,
+            // so keep the saved one.
+            var settings = request.Settings;
+            if (!settings.HasLastPlayedMode && toon.Settings.HasLastPlayedMode)
+                settings = settings.ToBuilder().SetLastPlayedMode(toon.Settings.LastPlayedMode).Build();
+
+            Logger.Debug("SetToonSettings() for {0}: last played mode {1}", toon.Name,
+                request.Settings.HasLastPlayedMode ? request.Settings.LastPlayedMode.ToString() : "not sent");
+            toon.Settings = settings;
+            return ByteString.Empty;
         }
 
         private ByteString CurrentToon(BattleClient client, ByteString data)
@@ -4582,7 +4613,7 @@ challenge_end_time_unix_seconds: 1583200800
 
         private ByteString SetGameAccountSettings(SetGameAccountSettings settings, BattleClient client)
         {
-            Logger.Debug("SetGameAccountSettings()");
+            Logger.Debug("SetGameAccountSettings(): {0}", settings.Settings.ToString().Replace('\n', ' '));
 
             client.Account.GameAccount.Settings = settings.Settings;
             return ByteString.Empty;
@@ -4620,7 +4651,23 @@ challenge_end_time_unix_seconds: 1583200800
             return new BNetPacket(header, payload);
         }
 
-        private ByteString OnGetAccountPrefs(BattleClient client, ByteString data) => ByteString.Empty;
+        /// <summary>
+        /// The client's options (Show Tutorials, item labels, key bindings and so on), as it last saved them. Until it
+        /// has saved any, nothing is sent and the client uses its defaults.
+        /// </summary>
+        private ByteString OnGetAccountPrefs(BattleClient client, ByteString data)
+        {
+            var prefs = client.Account.GameAccount.DBGameAccount.UIPrefs;
+            return prefs is { Length: > 0 } ? ByteString.CopyFrom(prefs) : ByteString.Empty;
+        }
+
+        private ByteString OnSetAccountPrefs(BattleClient client, ByteString data)
+        {
+            var request = SetAccountPrefs.ParseFrom(data);
+            Logger.Debug("SetAccountPrefs(): {0}", request.Prefs.ToString().Replace('\n', ' '));
+            client.Account.GameAccount.Preferences = request.Prefs;
+            return ByteString.Empty;
+        }
 
         #endregion
     }

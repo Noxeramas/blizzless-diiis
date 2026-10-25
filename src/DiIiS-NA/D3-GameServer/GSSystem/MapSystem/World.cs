@@ -825,6 +825,9 @@ namespace DiIiS_NA.GameServer.GSSystem.MapSystem
 			if (player != null)
 			{
 				int level = (forceLevel > 0 ? forceLevel : source.Attributes[GameAttributes.Level]);
+				// Smart Loot: equipment rolls for the player's class 85% of the time, otherwise for another class.
+				if (toonClass == ToonClass.Unknown && type == null)
+					toonClass = ItemGenerator.SmartLootClass(player);
 				if (toonClass == ToonClass.Unknown && type == null)
 				{
 					var item = ItemGenerator.GenerateRandomEquip(player, level, forceQuality, forceQuality, canBeUnidentified: canBeUnidentified);
@@ -1113,7 +1116,7 @@ namespace DiIiS_NA.GameServer.GSSystem.MapSystem
 			queue.Enqueue(() => {
 				BroadcastIfRevealed(plr => new FlippyMessage
 				{
-					ActorID = (int)source.GlobalID,
+					ActorID = (int)source.DynamicID(plr), // the client finds the actor the item flies from by its ID
 					Destination = item.Position,
 					SNOFlippyActor = actorSNO,
 					SNOParticleEffect = particleSNO
@@ -1487,7 +1490,7 @@ namespace DiIiS_NA.GameServer.GSSystem.MapSystem
 				int x = (int)((location.X - scene.Bounds.Left) / 2.5f);
 				int y = (int)((location.Y - scene.Bounds.Top) / 2.5f);
 				int total = (y * scene.NavMesh.SquaresCountX) + x;
-				if (total < 0 || total > scene.NavMesh.NavMeshSquareCount)
+				if (total < 0 || total >= scene.NavMesh.NavMeshSquareCount)
 				{
 					Logger.Error("Navmesh overflow!");
 					return defaultZ;
@@ -1495,7 +1498,12 @@ namespace DiIiS_NA.GameServer.GSSystem.MapSystem
 
 				try
 				{
-					return scene.NavMesh.Squares[total].Z;
+					// Squares hold the height within the scene; scenes outdoors sit above the world's zero.
+					// A square nothing can walk on has no useful height.
+					var square = scene.NavMesh.Squares[total];
+					if ((square.Flags & DiIiS_NA.Core.MPQ.FileFormats.Scene.NavCellFlags.AllowWalk) == 0)
+						return defaultZ;
+					return square.Z + scene.Position.Z;
 				}
 				catch
 				{

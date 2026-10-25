@@ -50,7 +50,6 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 		private InventoryGrid _buybackGrid;
 		private Item _inventoryGold;
 		private Item inventoryPotion;
-		public int BloodShards;
 		public int Platinum;
 		// backpack for spellRunes, their Items are kept in equipment
 		private uint[] _skillSocketRunes;
@@ -276,7 +275,8 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 			"Dagger",
 			"Spear",
 			"HandXbow",
-			"Wand"
+			"Wand",
+			"Scythe1H"
 		};
 
 		private static readonly List<string> TwoHandedWeapons = new List<string>{
@@ -289,21 +289,25 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 			"Flail2H",
 			"Polearm",
 			"Bow",
-			"Crossbow"
+			"Crossbow",
+			"Scythe2H"
 		};
 
 		public void BuyItem(ActorSystem.Actor vendor, Item originalItem, bool buyback)
 		{
 			if (originalItem.ItemDefinition.Name.StartsWith("PH_"))
 			{
+				// Kadala's mystery items: a weapon covers every weapon type of its hands.
 				string itemType = originalItem.ItemDefinition.Name.Substring(3);
-				if (itemType.Contains("1HWeapon"))
-					itemType = OneHandedWeapons.PickRandom();
-				if (itemType.Contains("2HWeapon"))
-					itemType = TwoHandedWeapons.PickRandom();
 				if (itemType.Contains("Pants"))
 					itemType = "Legs";
-				_inventoryGrid.AddItem(ItemGenerator.GetRandomItemOfType(_owner, ItemGroup.FromString(itemType)));
+				if (itemType.Contains("Phylactery"))
+					itemType = "NecromancerOffhand";
+				var itemTypes = itemType.Contains("1HWeapon") ? OneHandedWeapons
+					: itemType.Contains("2HWeapon") ? TwoHandedWeapons
+					: new List<string> { itemType };
+				_inventoryGrid.AddItem(ItemGenerator.GetRandomItemOfType(_owner,
+					itemTypes.Select(ItemGroup.FromString).Where(type => type != null).ToList()));
 			}
 			else
 			{
@@ -1564,6 +1568,11 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 			Logger.Warn("Identifying items not implemented yet");
 		}
 
+		internal const int IdentifyWithCastPower = 226757;
+		internal const int IdentifyWithCastLegendaryPower = 259848;
+		internal const int IdentifyAllWithCastPower = 293981;
+		internal const int IdentifySuccessEffectGroup = 230762; // soundGroup_identify_success
+
 		private void OnInventoryUseIdentifyItemMessage(InventoryUseIdentifyItemMessage msg)
 		{
 			var item = GetItemByDynId(_owner, msg.ItemID);
@@ -1571,10 +1580,13 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 				return;
 
 			int idDuration = 60;
+			// Casting the identify power plays its channel effect; its success sound plays when the item is identified.
 			_owner.StartCasting(idDuration, new Action(() =>
 			{
 				item.Identify();
-			}));
+				_owner.PlayEffectGroup(IdentifySuccessEffectGroup);
+			}), item.Quality >= 9 ? IdentifyWithCastLegendaryPower : IdentifyWithCastPower);
+			_owner.PlayChannelAnimation(idDuration);
 		}
 		//*
 		private void OnTrySalvageMessage(TrySalvageMessage msg)
@@ -2364,14 +2376,15 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 
 		public void RemoveBloodShardsAmount(int amount)
 		{
-			this.BloodShards -= amount;
+			_owner.SaveCollectedBloodShards();
 			_owner.Toon.GameAccount.BloodShards -= amount;
 			UpdateCurrencies();
 		}
 
 		public int GetBloodShardsAmount()
 		{
-			return BloodShards;
+			// Shards picked up are only added to the account every couple of seconds; count those too.
+			return _owner.Toon.GameAccount.BloodShards + _owner.BloodShardsCollectedTempCount;
 		}
 
 		public void LoadFromDB()
@@ -2381,7 +2394,6 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 			Item item = null;
 			int goldAmount = (int)_owner.World.Game.GameDbSession.SessionGet<DBGameAccount>(_owner.Toon.GameAccount.PersistentID).Gold;
 			// Logger.Warn($"User {this._owner.Toon.PersistentID} has {goldAmount} gold.");
-			this.BloodShards = (int)_owner.World.Game.GameDbSession.SessionGet<DBGameAccount>(_owner.Toon.GameAccount.PersistentID).BloodShards;
 			// Clear already present items
 			// LoadFromDB is called every time World is changed, even entering a dungeon
 			_inventoryGrid.Clear();

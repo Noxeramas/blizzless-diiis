@@ -15,6 +15,7 @@ namespace DiIiS_NA.Core.Storage.AccountDataBase.Mapper
 			Map(e => e.Flags);
 			Map(e => e.Banner).CustomSqlType("Bytea");
 			Map(e => e.UIPrefs).CustomSqlType("Bytea");
+			Map(e => e.UISettings).CustomSqlType("Bytea");
 			Map(e => e.SeenTutorials).CustomSqlType("Bytea");
 			Map(e => e.BossProgress).CustomSqlType("Bytea");
 			Map(e => e.StashIcons).CustomSqlType("Bytea");
