@@ -378,3 +378,6 @@ db/pgadmin/*
 
 # Generated config.mods.json
 config.mods.json
+
+# Codex instructions, kept local
+/AGENTS.md
