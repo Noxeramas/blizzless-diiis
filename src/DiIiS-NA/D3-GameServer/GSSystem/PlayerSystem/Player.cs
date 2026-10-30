@@ -183,6 +183,11 @@ public class Player : Actor, IMessageConsumer, IUpdateable
     public bool MysticUnlocked { get; set; }
     public bool KanaiUnlocked { get; set; }
 
+    internal Dictionary<int, float> CubedPowerValues { get; } = new();
+
+    public float GetLegendaryPowerValue(int powerSno) =>
+        Inventory.GetItemBonus(GameAttributes.Item_Power_Passive, powerSno);
+
     public bool HirelingTemplarUnlocked { get; set; }
     public bool HirelingScoundrelUnlocked { get; set; }
     public bool HirelingEnchantressUnlocked { get; set; }
@@ -384,11 +389,12 @@ public class Player : Actor, IMessageConsumer, IUpdateable
         SetAttributesMisc();
         SetAttributesOther();
         Inventory ??= new Inventory(this);
+        SkillSet ??= new SkillSet(this, Toon.Class, Toon);
+        KanaiCube.ApplyPowers(this);
         SetAttributesByItems(); //needs the Inventory
         SetAttributesByItemProcs();
         SetAttributesByGems();
         SetAttributesByItemSets();
-        SkillSet ??= new SkillSet(this, Toon.Class, Toon);
         SetAttributesByPassives(); //needs the SkillSet
         SetAttributesByParagon();
         SetNewAttributes();
@@ -1062,10 +1068,51 @@ public class Player : Actor, IMessageConsumer, IUpdateable
     public void SetAttributesByGems()
     {
         Inventory.SetGemBonuses();
+        UpdateLegacyOfDreams();
+    }
+
+    private static readonly int LegacyOfDreamsGbid = StringHashHelper.HashItemName("Unique_Gem_023_x1");
+
+    // What Legacy of Dreams multiplies the damage you (and your pets) deal and the damage you take by
+    public float LegacyOfDreamsDamage { get; private set; } = 1f;
+    public float LegacyOfDreamsDamageTaken { get; private set; } = 1f;
+    public int? LegacyOfDreamsRank { get; private set; }
+    public int LegacyOfDreamsLegendaryItems { get; private set; }
+    public int LegacyOfDreamsAncientItems { get; private set; }
+    public bool LegacyOfDreamsSetBonusActive { get; private set; }
+
+    // Legacy of Dreams, socketed in equipped jewelry: while no set bonus is active, every equipped legendary or set item
+    // adds 3.75% damage dealt per rank + 1 (375% at rank 99, its max) and 2% damage reduction. From rank 25, an ancient
+    // item adds twice that. The items add up, so 13 ancients at rank 99 give 9750% more damage and 52% less damage taken.
+    // The gem's base and per-rank Item_Power_Passive are both 0.0375; its power supplies the 2% reduction.
+    private void UpdateLegacyOfDreams()
+    {
+        LegacyOfDreamsDamage = LegacyOfDreamsDamageTaken = 1f;
+        LegacyOfDreamsRank = null;
+        LegacyOfDreamsLegendaryItems = LegacyOfDreamsAncientItems = 0;
+        LegacyOfDreamsSetBonusActive = false;
+        var equipped = Inventory.GetEquippedItems();
+        var gem = equipped.SelectMany(item => item.Gems).FirstOrDefault(g => g.GBHandle.GBID == LegacyOfDreamsGbid);
+        if (gem == null) return;
+
+        var rank = gem.Attributes[GameAttributes.Jewel_Rank];
+        LegacyOfDreamsRank = rank;
+        var legendaries = equipped.Where(i => i.Attributes[GameAttributes.Item_Quality_Level] >= 9).ToList();
+        LegacyOfDreamsLegendaryItems = legendaries.Count;
+        LegacyOfDreamsAncientItems = legendaries.Count(i => i.Attributes[GameAttributes.Ancient_Rank] > 0);
+        LegacyOfDreamsSetBonusActive = Inventory.HasSetBonus();
+        if (LegacyOfDreamsSetBonusActive) return;
+        foreach (var item in legendaries)
+        {
+            var times = rank >= 25 && item.Attributes[GameAttributes.Ancient_Rank] > 0 ? 2 : 1;
+            LegacyOfDreamsDamage += times * 0.0375f * (rank + 1);
+            LegacyOfDreamsDamageTaken -= times * 0.02f;
+        }
     }
 
     public void SetAttributesByItemProcs()
     {
+        EquippedLegendaryPowers.ApplyStoneOfJordan(this, EquippedLegendaryPowers.Elements(Toon.Class));
         Attributes[GameAttributes.Item_Power_Passive, 248776] =
             Inventory.GetItemBonus(GameAttributes.Item_Power_Passive, 248776); //cluck
         Attributes[GameAttributes.Item_Power_Passive, 248629] =
@@ -1313,7 +1360,7 @@ public class Player : Actor, IMessageConsumer, IUpdateable
                         case 208472: //AstralPresence
                             Attributes[GameAttributes.Resource_Max_Bonus, (int)Toon.HeroTable.PrimaryResource] += 20;
                             Attributes[GameAttributes.Resource_Regen_Per_Second, (int)Toon.HeroTable.PrimaryResource] =
-                                Toon.HeroTable.PrimaryResourceRegen + 2;
+                                Toon.HeroTable.PrimaryResourceRegen + 2.5f;
                             Attributes[GameAttributes.Resource_Cur, (int)Toon.HeroTable.PrimaryResource] =
                                 Toon.HeroTable.PrimaryResourceBase + Attributes[GameAttributes.Resource_Max_Bonus,
                                     (int)Toon.HeroTable.PrimaryResource];
@@ -1545,6 +1592,7 @@ public class Player : Actor, IMessageConsumer, IUpdateable
         else if (message is StashIconStateAssignMessage assignMessage)
             OnStashIconsAssign(client, assignMessage);
         else if (message is TransmuteItemsMessage itemsMessage) TransmuteItemsPlayer(client, itemsMessage);
+        else if (message is AssignLegendaryPowerMessage legendaryPowerMessage) KanaiCube.AssignPower(this, legendaryPowerMessage);
         else if (message is RiftStartAcceptedMessage acceptedMessage) OpenNephalem(client, acceptedMessage);
         else if (message is BossEncounterAcceptMessage) AcceptBossEncounter();
         else if (message is DeActivateCameraCutsceneMode mode)
@@ -1599,9 +1647,20 @@ public class Player : Actor, IMessageConsumer, IUpdateable
 
     public void JewelUpgrade(GameClient client, JewelUpgradeMessage message)
     {
-        var Jewel = Inventory.GetItemByDynId(this, message.ActorID);
+        // Urshi upgrades a gem in the bags or stash, or one socketed in equipped jewelry
+        bool IsUpgraded(Item gem) => gem.IsRevealedToPlayer(this) && gem.DynamicID(this) == message.ActorID;
+        var socketedIn = Inventory.GetEquippedItems().FirstOrDefault(item => item.Gems.Any(IsUpgraded));
+        var Jewel = socketedIn?.Gems.First(IsUpgraded) ?? Inventory.GetItemByDynId(this, message.ActorID);
         Jewel.Attributes[GameAttributes.Jewel_Rank]++;
+        Jewel.UpdateLegendaryGemAttributes();
         Jewel.Attributes.BroadcastChangedIfRevealed();
+        if (socketedIn == null)
+            Jewel.SaveAttributes();
+        else
+        {
+            Inventory.SaveSocketedGemRank(socketedIn, Jewel);
+            UpdateLegacyOfDreams();
+        }
         Attributes[GameAttributes.Jewel_Upgrades_Used]++;
         Attributes.BroadcastChangedIfRevealed();
         if (Attributes[GameAttributes.Jewel_Upgrades_Used] == Attributes[GameAttributes.Jewel_Upgrades_Max] +
@@ -2654,7 +2713,10 @@ public class Player : Actor, IMessageConsumer, IUpdateable
 
     private void OnSecondaryPowerMessage(GameClient client, SecondaryAnimationPowerMessage message)
     {
-        World.PowerManager.RunPower(this, message.PowerSNO, (uint)message.annTarget);
+        var targetId = message.annTarget == -1
+            ? uint.MaxValue
+            : World.GetGlobalId(this, (uint)message.annTarget);
+        World.PowerManager.RunPower(this, message.PowerSNO, targetId);
     }
 
     private void OnMiscPowerMessage(GameClient client, MiscPowerMessage message)
@@ -3052,6 +3114,8 @@ public class Player : Actor, IMessageConsumer, IUpdateable
     {
         if (BetweenWorlds) return;
         if (DisconnectIdle()) return;
+
+        EquippedLegendaryPowers.Update(this);
 
         // Check the gold
         if (InGameClient.Game.TickCounter % 120 == 0 && World != null && GoldCollectedTempCount > 0)
@@ -4149,7 +4213,7 @@ public class Player : Actor, IMessageConsumer, IUpdateable
 
             ActiveSkills = SkillSet.ActiveSkills,
             snoTraits = SkillSet.PassiveSkills,
-            GBIDLegendaryPowers = new int[4] { -1, -1, -1, -1 },
+            GBIDLegendaryPowers = SkillSet.LegendaryPowers,
 
             SavePointData = new SavePointData { snoWorld = -1, SavepointId = -1 },
             EventFlags = 0
@@ -4554,6 +4618,7 @@ public class Player : Actor, IMessageConsumer, IUpdateable
     {
         // var bloodShards = Toon.GameAccount.BloodShards; // Removed by @iamdroppy @ 12/02/2023
         Inventory.UpdateCurrencies();
+        KanaiCube.LoadPowers(this);
     }
 
     public void LoadMailData()
@@ -5812,13 +5877,16 @@ public class Player : Actor, IMessageConsumer, IUpdateable
         ModifyResourceAttribute(PrimaryResourceID, amount);
     }
 
-    public void UsePrimaryResource(float amount, bool tick = false)
+    public void UsePrimaryResource(float amount, bool tick = false, bool costIsFinal = false)
     {
-        amount = Math.Max(
+        if (!costIsFinal)
+        {
+            amount = Math.Max(
             (amount - Attributes[GameAttributes.Resource_Cost_Reduction_Amount]) * (1f -
                 Attributes[GameAttributes.Resource_Cost_Reduction_Percent_Total,
                     (int)Toon.HeroTable.PrimaryResource + 1]), 0);
-        amount = amount * (1f - DecreaseUseResourcePercent);
+            amount = amount * (1f - DecreaseUseResourcePercent);
+        }
         if (Toon.Class == ToonClass.Crusader)
         {
             _wrathSpent += (int)amount;

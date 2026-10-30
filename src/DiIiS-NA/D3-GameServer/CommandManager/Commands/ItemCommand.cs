@@ -1,14 +1,17 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using DiIiS_NA.Core.Helpers.Math;
 using DiIiS_NA.GameServer.Core.Types.Math;
 using DiIiS_NA.GameServer.GSSystem.ItemsSystem;
+using DiIiS_NA.GameServer.MessageSystem;
 using DiIiS_NA.GameServer.MessageSystem.Message.Definitions.Inventory;
 using DiIiS_NA.LoginServer.AccountsSystem;
 using DiIiS_NA.LoginServer.Battle;
 
 namespace DiIiS_NA.GameServer.CommandManager;
 
-[CommandGroup("item", "Spawns an item (with a name or type).\nUsage: item [type <type>|<name>] [amount]",
+[CommandGroup("item", "Spawns an item (with a name or type), rolled for your class.\nUsage: item [type <type>|<name>] [amount] [ancient] [rank <rank>]",
     Account.UserLevels.GM, inGameOnly: true)]
 public class ItemCommand : CommandGroup
 {
@@ -40,17 +43,36 @@ public class ItemCommand : CommandGroup
 
         if (amount > 100) amount = 100;
 
+        // "ancient" anywhere after the name makes a level-70 legendary ancient; otherwise it isn't
+        var ancient = @params.Skip(1).Any(p => p.Equals("ancient", StringComparison.OrdinalIgnoreCase));
+
+        // "rank <rank>" sets a legendary gem's rank, which is 1 otherwise
+        var rankAt = Array.FindIndex(@params, p => p.Equals("rank", StringComparison.OrdinalIgnoreCase));
+        var rank = 1;
+        if (rankAt > 0)
+        {
+            if (!name.StartsWith("Unique_Gem_", StringComparison.OrdinalIgnoreCase))
+                return "Only legendary gems (Unique_Gem_...) have a rank.";
+            if (rankAt + 1 >= @params.Length || !int.TryParse(@params[rankAt + 1], out rank) || rank < 1)
+                return "Give the rank as a number, for example: item Unique_Gem_023_x1 rank 99";
+        }
+
         for (var i = 0; i < amount; i++)
         {
             var position = new Vector3D(player.Position.X + (float)RandomHelper.NextDouble() * 20f,
                 player.Position.Y + (float)RandomHelper.NextDouble() * 20f,
                 player.Position.Z);
 
-            var item = ItemGenerator.Cook(player, name);
+            var item = ItemGenerator.Cook(player, name, ancient ? 1 : 0);
+            if (rankAt > 0)
+            {
+                item.Attributes[GameAttributes.Jewel_Rank] = rank;
+                item.UpdateLegendaryGemAttributes();
+            }
             item.EnterWorld(position);
         }
 
-        return $"Spawned {amount} items with name: {name}";
+        return $"Spawned {amount} {(ancient ? "ancient " : "")}{(rankAt > 0 ? $"rank {rank} " : "")}items with name: {name}";
     }
 
     [Command("type", "Spawns random items of a given type.\nUsage: item type <type> [amount]")]

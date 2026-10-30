@@ -29,6 +29,9 @@ namespace DiIiS_NA.Core.Storage.AccountDataBase.Mapper
 			Map(e => e.Passive3).Not.Nullable().Default("-1");
 
 			Map(e => e.PotionGBID).Not.Nullable().Default("-1");
+			Map(e => e.LegendaryPower0).Not.Nullable().Default("-1");
+			Map(e => e.LegendaryPower1).Not.Nullable().Default("-1");
+			Map(e => e.LegendaryPower2).Not.Nullable().Default("-1");
 		}
 	}
 }

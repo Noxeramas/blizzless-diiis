@@ -134,6 +134,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
             GBHandle.GBID = definition.Hash;
             SetInitialValues(definition);
             Attributes.FillBySerialized(serializedGameAttributeMap);
+            UpdateLegendaryGemAttributes();
             if (Attributes[GameAttributes.Seed] == 0)
             {
                 Attributes[GameAttributes.Seed] = FastRandom.Instance.Next();
@@ -287,6 +288,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
             ApplyDurability(definition);
             ApplySkills(definition);
             ApplyAttributeSpecifier(definition);
+            UpdateLegendaryGemAttributes();
 
             var affixNumber = 1;
             if (Attributes[GameAttributes.Item_Quality_Level] >= 3)
@@ -641,6 +643,48 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
                         else
                             Attributes[attr] += (int)result;
                     }
+                }
+            }
+        }
+
+        // The base item attributes describe rank zero. Attribute1[0] is the increase per rank;
+        // Attribute1[1] unlocks at JewelSecondaryEffectUnlockRank. Recompute instead of accumulating
+        // so loading saved gems and repeated rank changes cannot compound the displayed bonus.
+        public void UpdateLegendaryGemAttributes()
+        {
+            var definition = ItemDefinition;
+            if (!definition.Name.StartsWith("Unique_Gem_", StringComparison.OrdinalIgnoreCase)) return;
+
+            var rank = Attributes[GameAttributes.Jewel_Rank];
+            var increase = definition.Attribute1[0];
+            if (increase.AttributeId != -1)
+            {
+                var initial = definition.Attribute.Single(a => a.AttributeId == increase.AttributeId && a.SNOParam == increase.SNOParam);
+                SetEffect(increase, Evaluate(initial) + rank * Evaluate(increase));
+            }
+            var secondary = definition.Attribute1[1];
+            if (secondary.AttributeId != -1)
+            {
+                var attribute = GameAttributes.Attributes[secondary.AttributeId];
+                var lockedValue = attribute is GameAttributeF ? attribute.DefaultAttributeValue.ValueF : attribute.DefaultAttributeValue.Value;
+                SetEffect(secondary, rank >= definition.JewelSecondaryEffectUnlockRank ? Evaluate(secondary) : lockedValue);
+            }
+
+            float Evaluate(AttributeSpecifier effect)
+            {
+                if (!FormulaScript.Evaluate(effect.Formula.ToArray(), RandomGenerator, out var value))
+                    throw new InvalidOperationException($"Cannot evaluate legendary gem attribute {definition.Name}/{effect.AttributeId}.");
+                return value;
+            }
+
+            void SetEffect(AttributeSpecifier effect, float value)
+            {
+                int? key = effect.SNOParam == -1 ? null : effect.SNOParam;
+                switch (GameAttributes.Attributes[effect.AttributeId])
+                {
+                    case GameAttributeF attribute: Attributes[attribute, key] = value; break;
+                    case GameAttributeI attribute: Attributes[attribute, key] = (int)value; break;
+                    default: throw new InvalidOperationException($"Unsupported legendary gem attribute {effect.AttributeId}.");
                 }
             }
         }

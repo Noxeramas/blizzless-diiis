@@ -3,7 +3,10 @@ Development launcher: points Diablo III at the local D3Offline server, starts th
 switches back to Blizzard's servers when the game closes. The server's certificate is trusted
 once and left in place; only the hosts redirect is toggled. Use -Undo to remove both.
 #>
-param([switch]$Undo)
+param(
+    [switch]$Undo,
+    [ValidateSet('Enable', 'Disable')][string]$Redirect
+)
 
 $ErrorActionPreference = 'Stop'
 $marker = '# D3Offline'
@@ -13,16 +16,18 @@ $hostsPath = Join-Path $env:WINDIR 'System32\drivers\etc\hosts'
 $hostNames = 'us.actual.battle.net', 'eu.actual.battle.net', 'telemetry-in.battle.net', 'iir.blizzard.com'
 $caPath = Join-Path $env:LOCALAPPDATA 'D3Offline\D3Offline-LocalCA.cer'
 
-# The hosts file needs admin, so relaunch elevated (one UAC prompt per run).
-$principal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
-if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"")
-    if ($Undo) { $argList += '-Undo' }
-    Start-Process powershell -Verb RunAs -ArgumentList $argList
-    return
-}
-
 function Set-Redirect([bool]$enabled) {
+    # Elevate only the hosts-file edit. The game, certificate store and meter
+    # must stay in the launching user's normal Windows session.
+    $principal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
+    if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        $action = if ($enabled) { 'Enable' } else { 'Disable' }
+        $helper = Start-Process powershell -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Redirect', $action
+        )
+        if ($helper.ExitCode -ne 0) { throw "Could not $($action.ToLowerInvariant()) the D3Offline hosts redirect." }
+        return
+    }
     $lines = @(Get-Content $hostsPath | Where-Object { $_ -notlike "*$marker" })
     if ($enabled) { $lines += $hostNames | ForEach-Object { "127.0.0.1 $_ $marker" } }
     Set-Content -Path $hostsPath -Value $lines -Encoding ASCII
@@ -41,6 +46,10 @@ function Find-GameExe {
 }
 
 try {
+    if ($Redirect) {
+        Set-Redirect ($Redirect -eq 'Enable')
+        return
+    }
     if ($Undo) {
         Set-Redirect $false
         Get-ChildItem Cert:\CurrentUser\Root | Where-Object Subject -like 'CN=D3Offline Local CA*' | Remove-Item
@@ -65,6 +74,11 @@ try {
     try {
         Write-Host 'Diablo III is pointed at the local server. Close the game to switch back.'
         $game = Start-Process -FilePath $gameExe -ArgumentList '-launch' -WorkingDirectory (Split-Path $gameExe) -PassThru
+        $meter = Join-Path $PSScriptRoot 'CombatMeter\bin\Release\net10.0-windows\D3Offline.CombatMeter.exe'
+        if (Test-Path -LiteralPath $meter) {
+            Start-Process -FilePath $meter -WorkingDirectory (Split-Path $meter) -WindowStyle Hidden
+            Write-Host 'Combat meter: F8 shows or hides the overlay (windowed or borderless game mode).'
+        }
         $game.WaitForExit()
         Wait-Process -Name 'Diablo III64' -ErrorAction SilentlyContinue
     }
@@ -75,6 +89,7 @@ try {
     Start-Sleep -Seconds 3
 }
 catch {
+    if ($Redirect) { Write-Error $_ -ErrorAction Continue; exit 1 }
     Write-Host $_.Exception.Message -ForegroundColor Red
     Read-Host 'Press Enter to close'
 }

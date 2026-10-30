@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace DiIiS_NA.GameServer.MessageSystem.Message.Definitions.Skill
 {
-    [Message(new[] { Opcodes.AssignLegendaryPowerMessage, Opcodes.AssignLegendaryPowerToSlot })]
+    [Message(new[] { Opcodes.AssignLegendaryPowerMessage, Opcodes.AssignLegendaryPowerToSlot }, Consumers.Player)]
     public class AssignLegendaryPowerMessage : GameMessage
     {
         public int /* gbid */ SNOSkill;

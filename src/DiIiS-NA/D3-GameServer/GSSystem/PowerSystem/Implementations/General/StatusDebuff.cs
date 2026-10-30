@@ -30,15 +30,17 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 		{
 			if (_immuneCheckAttribute != null)
 				_immuneBlocked = Target.Attributes[_immuneCheckAttribute];
+			if ((_statusAttribute == GameAttributes.Frozen || _statusAttribute == GameAttributes.IsRooted) &&
+				EquippedLegendaryPowers.Has(Target, EquippedLegendaryPowers.IceClimbers))
+				_immuneBlocked = true;
 		}
 
 		public override bool Apply()
 		{
-			if (!base.Apply())
-				return false;
-
 			if (_immuneBlocked)
 				return false;  // TODO: play immune float message?
+			if (!base.Apply())
+				return false;
 
 			Target.Attributes[_statusAttribute] = true;
 			Target.Attributes.BroadcastChangedIfRevealed();
@@ -257,6 +259,8 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 					(Target as Boss).AntiCCTriggerCount = 0;
 				}
 			}
+			// a get-hit pause holds the walk speed at 0 as well; end it first, so the stun saves the real speed
+			World.BuffManager.RemoveBuffs(Target, typeof(HitRecoveryDebuff));
 			Speed = Target.WalkSpeed;
 			Target.WalkSpeed = 0f;
 			Target.World.BroadcastIfRevealed(plr => new MessageSystem.Message.Definitions.ACD.ACDTranslateSyncMessage() { ActorId = Target.DynamicID(plr), Position = Target.Position, Snap = false }, Target);
@@ -268,6 +272,34 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 		{
 			base.Remove();
 			Target.WalkSpeed = Speed;
+		}
+	}
+
+	// Holds an actor still while it plays its get-hit animation (see HitPayload). A hit during the pause only extends
+	// it, so the walk speed from before the first hit is the one put back.
+	public class HitRecoveryDebuff : TimedBuff
+	{
+		private float _walkSpeed;
+
+		public HitRecoveryDebuff(TickTimer timeout)
+		{
+			Timeout = timeout;
+		}
+
+		public override bool Apply()
+		{
+			if (!base.Apply())
+				return false;
+
+			_walkSpeed = Target.WalkSpeed;
+			Target.WalkSpeed = 0f;
+			return true;
+		}
+
+		public override void Remove()
+		{
+			base.Remove();
+			Target.WalkSpeed = _walkSpeed;
 		}
 	}
 

@@ -64,6 +64,14 @@ The first version: getting DiIiS onto the 2.8.0 client, plus fixes for what I ra
   - The log file is written in batches.
   - Packet dumps only get built if something records them.
   - One attribute warning was logged thousands of times, each with a slow source lookup. It's logged once now.
+- Monsters froze and the game lagged when you hit lots of them (Energy Twister on a pack, for example). On a third of the hits that didn't kill, a monster flinched, and the server stopped it for 0.3 seconds by tying up a worker thread in a busy loop. Your own actions are handled on those same threads. A second hit during that time saved the stopped speed and put it back afterwards, so monsters could stay stuck in place. The pause now runs on the game's own timers, and a second hit only extends it.
+- Monsters no longer send a hit effect every time the server checks what's near you. Every monster within 200 yards played a hit effect (a sound and a flash) five times a second, whether or not anything hit it. In a rift that came to around 500 messages a second, more than all the real damage numbers.
+- Teleport moves you right away. DiIiS waited 0.3 seconds first, on every cast. The power's only delay in the game data (0.4 seconds) is for the effects after you land. Wormhole's follow-up teleports still wait 0.3 seconds, as on live. Reversal's jump back keeps DiIiS's 0.3 seconds, since I don't know live's timing for it.
+- Arcane Torrent ticks at live's rate: 3 times per attack (2 with Death Blossom, 1.5 with Arcane Mines), so faster attack speed means more, smaller hits. DiIiS ticked every 0.3 seconds whatever your attack speed. Damage per second is the same.
+- The server knows where walking monsters are. It used to update a monster's position only at the end of each walk step, and skipped the update if the monster was flinching just then. Your client still walked the whole step. In a fight, monsters ended up a step or two (20 to 40 yards) away from where you saw them. So Arcane Torrent aimed at a monster landed somewhere else, sometimes off screen, and tornadoes and other area hits damaged monsters that weren't near them on your screen. The server now follows each step as it happens, the same way your client draws it.
+- Energy Twister's damage follows the tornado. It used to stay where the tornado spawned.
+- Tornadoes keep moving. Once the server tracked them, each new point they headed for was closer than the last, so they stood still for about 4 of their 6 seconds, mostly once they reached a pack. They go back to DiIiS's path (out to where you cast, then wandering around the spot you cast from), and pick their next point when they reach one instead of every half second.
+- Every 30 seconds the server logs how long your client's data waited before it was handled (at Debug level, next to the update timings). Long waits there mean the server delayed your actions.
 
 ### Fixes from play testing
 
@@ -77,6 +85,8 @@ The first version: getting DiIiS onto the 2.8.0 client, plus fixes for what I ra
 - No animation or sound when identifying.
 - "Select A Play Mode" popped up at every login. Account settings, options and hero settings are saved now.
 - Tutorials showed with tutorials off, and seen ones came back.
+- The Ruins of Corvus waypoint sometimes stopped working until you restarted the game. DiIiS's saved map tiles for Corvus (and Path to Corvus) include a scene that 2.8.0 doesn't have. When the random layout picked it, the map failed to build, and the half-built world stayed around for the rest of the session. Tiles whose scene isn't in your game data are skipped now. Two other maps had one such tile each (three Act II caves, Arreat Crater level 1), but they never ended up using it.
+- Ruins of Sescheron and the Eternal Woods had no monsters. DiIiS has no spawn list for either, since they were added after DiIiS's data. Sescheron now spawns Ice Clan Warriors, Impalers and Shamans, Glacial Monstrosities and Colossi, Frost Maggots and Ice Porcupines. The Eternal Woods spawn Frozen Corpses, Shuffling Corpses, Decaying Remains, Glacial Monstrosities and Colossi and Ice Porcupines, plus its uniques Kashyyk, Lap'yin, Deadeye and Quillflurry. The Icy Pit inside the woods still has none.
 - Exceptions and freezes:
   - entering some level areas
   - killing a bounty unique in some areas
@@ -127,9 +137,27 @@ Before this, only the cow portal worked. Everything else either kept your stuff 
   - Tiers match the item level.
   - CDR and area damage roll again.
 - Drops, Kadala and the cube all pull from the same pool.
+- Legendary stats roll in live's ranges. They were a tier low before (350-415 Intelligence on boots instead of 416-500).
+- Ancient items: 10% of level 70 legendaries and set items are ancient, with live's higher ranges (550-650 Intelligence on boots). Primal ancients aren't in yet.
 - Cosmetic rewards with no stats (Conqueror's Shako and the rest of that season set, Helm of the Hierarch) don't drop or come from gambling anymore.
 - Level 70 magic and rare items use level 70 bases only. Before, they could get level 60 to 65 bases with less armor or damage.
 - Magic and rare items are always identified, and legendary and set items always drop unidentified, like on live. Before, 5% of magic and rare items came unidentified, and only 30% of legendaries did. An existing `config.mods.json` keeps its old values, so set `UnidentifiedDropChances` to 100 and 0 there.
+
+### Legendary powers
+
+- Wire the remaining equipped Wizard powers: Aquila Cuirass, Stone Gauntlets/Ice Climbers, Hergbrash's Binding, Ashnagarr's Blood Bracer, Stone of Jordan, Convention of Elements, Squirt's Necklace, and Leoric's Crown's helmet-gem multiplier. Add supported buff icons and meter labels; correct channel flat-cost splitting and Ward capacity display/absorption. The [implementation registry](docs/legendary-powers.md) tracks all fourteen audited item powers and Legacy of Dreams, including incomplete/live-unverified behavior.
+- Add the current equipped Etched Sigil's free Energy Twisters and damage bonus. Casts follow channel ticks and the published attack-speed breakpoints, keep the cursor aim, and suppress secondary on-hit procs. The three channels use client formulas for timing and resource cost per tick. Twister damage radii come from game data, and Raging Storm merges one matching twister from the same player. Exact live parity still needs verification; see [implementation, evidence, and remaining work](docs/etched-sigil.md).
+- Add the current equipped Twisted Sword's rolled Energy Twister damage bonus with the 2.7.7 three-stack cap, automatic Raging Storm, and up to five merged casts. Merged tornadoes retain the selected rune and count their contributing casts toward the sword bonus. Wicked Wind's merge damage follows published live measurements. See [evidence, regression checks, and remaining parity work](docs/twisted-sword.md).
+- Add Mantle of Channeling for the three Wizard channels, with the item's damage roll, 25% damage reduction and no startup delay. Correct Twisted Sword/Galvanizing Ward icon slots, Flame Ward's element and reduction, Arcane Torrent's damage ramp, Deflection's stacking shields, Wormhole's single follow-up, and the outdated Astral Presence/Audacity values. See the [selected-rune audit, evidence and remaining Wizard work](docs/wizard-status.md); these changes do not establish complete live parity.
+- Add current Valthek's Rebuke and Ranslor's Folly handlers for equipped and cubed powers: independent Twister damage bonuses, straight travel with the Wicked Wind exception, and periodic lesser-enemy pulls with per-target cooldowns. The combat meter names both multipliers. See [client evidence, regression checks and remaining timing/collision work](docs/twister-cube.md).
+
+### Legendary gems
+
+- Legacy of Dreams works. While you have no set bonus, each legendary or set item you wear adds 3.75% damage per rank + 1 (375% at rank 99) and 2% damage reduction. From rank 25, ancient items count double. The items add up: 13 ancients at rank 99 give 9750% more damage and 52% less damage taken. It boosts your pets' damage too. The other legendary gems still do nothing.
+- Gem ranks are saved. A socketed gem used to go back to rank 1 after a relog or when you took it out, and an Urshi upgrade on a gem in your bags was lost on relog.
+- Upgrading a gem socketed in equipped jewelry with Urshi works. It used to fail.
+- Greater rift guardians can drop Legacy of Dreams. They only picked from the first 22 gems before.
+- Taking the gems out of an equipped item removes their bonuses right away.
 
 ### GM commands
 
@@ -137,3 +165,6 @@ Before this, only the cow portal worked. Everything else either kept your stuff 
 - `!shards [count]` adds blood shards.
 - `!lootpool <type> [class] [level]` lists which legendaries an item type can roll for a class.
 - `!unlockart [level]` now takes a level.
+- `!item` rolls an item's random affixes for your class. Before, they rolled for no class: any main stat, and never your class's skill bonuses.
+- `!item <name> [amount] ancient` spawns ancient legendaries. Without `ancient`, they aren't.
+- `!item <gem> rank <rank>` spawns a legendary gem at that rank, for example `!item Unique_Gem_023_x1 rank 99` for Legacy of Dreams.

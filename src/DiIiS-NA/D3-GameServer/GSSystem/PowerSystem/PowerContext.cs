@@ -30,6 +30,8 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem
 		public World World;
 		public Actor User;
 		public Actor Target;
+		// Item-generated attacks do not trigger effects that use the skill's proc coefficient.
+		public bool IsItemProc;
 
 		public int DogsSummoned = 0;
 
@@ -89,6 +91,8 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem
 
 		public float GetProcCoefficient()
 		{
+			if (IsItemProc) return 0f;
+
 			//Bugged powers list
 			switch (PowerSNO)
 			{
@@ -111,12 +115,17 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem
 			}
 		}
 
-		public void UsePrimaryResource(float amount)
+		public void UsePrimaryResource(float amount, float tickFraction = 1f)
 		{
 			if (User is Player player)
 			{
 				if (player.Attributes[GameAttributes.Free_Cast_All] != true)
-					player.UsePrimaryResource(amount - player.Attributes[GameAttributes.Power_Resource_Reduction, PowerSNO]);
+				{
+					if (Implementations.EquippedLegendaryPowers.IsWizardChannel(PowerSNO))
+						player.UsePrimaryResource(Implementations.EquippedLegendaryPowers.ChannelCost(player, PowerSNO, amount, tickFraction), costIsFinal: true);
+					else
+						player.UsePrimaryResource(amount - player.Attributes[GameAttributes.Power_Resource_Reduction, PowerSNO]);
+				}
 			}
 		}
 

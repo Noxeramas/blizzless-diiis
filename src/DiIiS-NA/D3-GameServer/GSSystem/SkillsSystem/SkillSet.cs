@@ -18,6 +18,7 @@ namespace DiIiS_NA.GameServer.GSSystem.SkillsSystem
 		public ActiveSkillSavedData[] ActiveSkills { get; }
 		public HotbarButtonData[] HotBarSkills { get; }
 		public int[] PassiveSkills { get; }
+		public int[] LegendaryPowers { get; }
 
 		protected static readonly Logger Logger = LogManager.CreateLogger();
 
@@ -27,6 +28,7 @@ namespace DiIiS_NA.GameServer.GSSystem.SkillsSystem
 			Player = player;
 			// var dbToon = player.Toon.DBToon;
 			var dbActiveSkills = player.Toon.DbActiveSkills;
+			LegendaryPowers = new[] { dbActiveSkills.LegendaryPower0, dbActiveSkills.LegendaryPower1, dbActiveSkills.LegendaryPower2, -1 };
 			ActiveSkills = new ActiveSkillSavedData[6]
 			{
 				new()

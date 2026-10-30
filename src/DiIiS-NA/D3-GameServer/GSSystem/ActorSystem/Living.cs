@@ -45,7 +45,6 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem
 
 		public override bool Reveal(Player player)
 		{
-			PlayEffect(MessageSystem.Message.Definitions.Effect.Effect.Hit);
 			if (!base.Reveal(player))
 				return false;
 			if (AnimationSet != null)

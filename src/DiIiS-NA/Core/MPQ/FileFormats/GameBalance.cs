@@ -572,8 +572,9 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
 
             /// <summary>
             /// 2.8.0 records are 1408 bytes: 32 bytes were added after I38 and the jewel fields at the end were
-            /// reworked. Fields are read at their 2.8.0 offsets, matched to 2.7.4 by type and order. The fields after
-            /// Attribute1 aren't mapped yet and keep their defaults; the server doesn't use them.
+            /// reworked. Fields are read at their 2.8.0 offsets, matched to 2.7.4 by type and order.
+            /// Attribute1 contains the per-rank increase and the secondary jewel effect. Later fields other than
+            /// the secondary unlock rank remain unmapped.
             /// </summary>
             private void ReadTail280(Stream stream, long start)
             {
@@ -600,6 +601,7 @@ namespace DiIiS_NA.Core.MPQ.FileFormats
                 Attribute1 = new AttributeSpecifier[2]; //1248
                 for (int i = 0; i < 2; i++)
                     Attribute1[i] = new AttributeSpecifier(stream);
+                JewelSecondaryEffectUnlockRank = stream.ReadValueS32(); //1296 in the installed 2.8.0 item records
             }
 
 

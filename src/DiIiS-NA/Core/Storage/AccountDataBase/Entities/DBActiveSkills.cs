@@ -25,5 +25,8 @@ namespace DiIiS_NA.Core.Storage.AccountDataBase.Entities
 		public virtual int Passive3 { get; set; }
 
 		public virtual int PotionGBID { get; set; }
+		public virtual int LegendaryPower0 { get; set; } = -1;
+		public virtual int LegendaryPower1 { get; set; } = -1;
+		public virtual int LegendaryPower2 { get; set; } = -1;
 	}
 }

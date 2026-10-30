@@ -76,7 +76,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 						(User as Player).GeneratePrimaryResource(ScriptFormula(13));
 
 				if (Rune_E > 0 && !HasBuff<BarrierBuff>(User))          //Barrier Blades, buff slot 1
-					AddBuff(User, new BarrierBuff(User.Attributes[GameAttributes.Hitpoints_Max_Total] * 0.04f, WaitSeconds(ScriptFormula(9))));
+					AddBuff(User, new BarrierBuff(User.Attributes[GameAttributes.Hitpoints_Max_Total] * 0.04f * EquippedLegendaryPowers.ShieldMultiplier(User), WaitSeconds(ScriptFormula(9))));
 			};
 			blade.Apply();
 			yield break;
@@ -1211,99 +1211,201 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 	[ImplementsPowerSNO(SkillsSystem.Skills.Wizard.Offensive.EnergyTwister)]
 	public class EnergyTwister : Skill
 	{
+		public const int ValtheksRebukePowerSNO = 484597;
+		public const int RanslorsFollyPowerSNO = 478491;
 		public override IEnumerable<TickTimer> Main()
 		{
-			TickTimer timeout = WaitSeconds(ScriptFormula(8));
 			UsePrimaryResource(ScriptFormula(15));
+			SpawnTwister();
+			yield break;
+		}
 
-			var multiplier = ScriptFormula(16) * ScriptFormula(12) * 0.5f / ScriptFormula(8);   //damage per update
-			var dmgType = DamageType.Arcane;
-			if (Rune_A > 0) dmgType = DamageType.Fire;
-			if (Rune_C > 0) dmgType = DamageType.Lightning;
-			if (Rune_D > 0) dmgType = DamageType.Cold;          //Mistral Breeze
+		internal EffectActor ActiveTwister { get; private set; }
+		internal int CastCount { get; private set; } = 1;
+		internal bool IsActive => CastCount > 0 && ActiveTwister?.World == World && World != null &&
+			User.World == World && !User.Dead && !ActiveTwister.Timeout.TimedOut;
+		private uint _firstCastId;
+		private int _mergeLimit;
+		private float _totalDamage;
+		private DamageType _damageType;
+		private bool _stationary, _galeForce, _straightPath;
+		private Vector3D _castAim;
+		private TickTimer _pullTimer;
 
-			if (Rune_C > 0)             //Storm Chaser
+		internal void InitializeTwister(float totalDamage)
+		{
+			_totalDamage = totalDamage;
+			_mergeLimit = TwistedSwordBuff.GetEquippedBonus(User) > 0f ? 5 : Rune_B > 0 ? 2 : 1;
+			_damageType = Rune_A > 0 ? DamageType.Fire : Rune_C > 0 ? DamageType.Lightning :
+				Rune_D > 0 ? DamageType.Cold : DamageType.Arcane;
+			_stationary = Rune_E > 0;
+			_straightPath = !_stationary && User is Player player && player.GetLegendaryPowerValue(ValtheksRebukePowerSNO) > 0f;
+			_galeForce = Rune_A > 0;
+			_castAim = new Vector3D(TargetPosition);
+		}
+
+		internal void SpawnTwister()
+		{
+			InitializeTwister(ScriptFormula(0));
+			if (Rune_C > 0) // Storm Chaser; merging must not grant another charge.
 				AddBuff(User, new TwisterBuff());
 
-			var Twister = new EffectActor(
-				this,
-				RuneSelect(
-					ActorSno._wizard_tornado,
-					ActorSno._x1_wizard_tornado_fire,
-					ActorSno._wizard_tornado_obsidian,
-					ActorSno._wizard_tornado_golden,
-					ActorSno._x1_wizard_tornado_damage,
-					ActorSno._wizard_tornado // was 210804
-				),
-				Rune_E > 0 ? TargetPosition : User.Position
-			);
-			Twister.Timeout = WaitSeconds(ScriptFormula(8));
-			Twister.Scale = 1f;
-			if (Twister != null) Twister.Spawn();       //Could be wiped by Rune_B at this point
+			SpawnTornado(new Vector3D(_stationary ? TargetPosition : User.Position));
+		}
 
-			Twister.UpdateDelay = 0.5f;
-			Twister.OnUpdate = () =>
+		private void SpawnTornado(Vector3D position)
+		{
+			var merged = CastCount > 1;
+			var twister = new EffectActor(this, merged ? ActorSno._wizard_tornado_big : RuneSelect(
+				ActorSno._wizard_tornado,
+				ActorSno._x1_wizard_tornado_fire,
+				ActorSno._wizard_tornado_obsidian,
+				ActorSno._wizard_tornado_golden,
+				ActorSno._x1_wizard_tornado_damage,
+				ActorSno._wizard_tornado), position);
+			var duration = ScriptFormula(merged ? 4 : 8);
+			var tickPeriod = ScriptFormula(11);
+			twister.Timeout = WaitSeconds(duration);
+			twister.Scale = 1f;
+			twister.Spawn();
+			ActiveTwister = twister;
+			if (!merged) _firstCastId = twister.GlobalID;
+			TwistedSwordBuff.Track(this);
+
+			var mover = new ActorMover(twister);
+			var wanderCenter = new Vector3D(position);
+			// Ranslor labels SF24/25/26 "Tickrate", "Radius", "Per Target ICD" (2, 30, 6).
+			// Preserve pulse phase through merges; first-pulse timing still needs live comparison.
+			_pullTimer ??= WaitSeconds(ScriptFormula(24));
+			TickTimer damageTimer = null;
+			twister.OnUpdate = () =>
 			{
-				if (Twister.World == null) return;
-
-				AttackPayload attack = new AttackPayload(this);
-				attack.Targets = GetEnemiesInRadius(Twister.Position, 6f);
-				attack.AddWeaponDamage(multiplier, dmgType);
-				attack.OnHit = hitPayload =>
+				if (twister.World == null) return;
+				if (mover.ArrivalTime != null) mover.Update();
+				// The selected rune remains effective when the sword grants Raging Storm.
+				if (!_stationary && mover.Arrived)
 				{
-					if (Rune_A > 0)         //Gale Force, done in HitPayload
-						if (!HasBuff<GaleForceDebuff>(hitPayload.Target))
-							AddBuff(hitPayload.Target, new GaleForceDebuff(ScriptFormula(23), WaitSeconds(ScriptFormula(22))));
+					var destination = _straightPath ? StraightPathDestination(twister.Position,
+						ScriptFormula(18) * (twister.Timeout.TimeoutTick - World.Game.TickCounter)) : TargetPosition;
+					mover.Move(destination, ScriptFormula(18), new ACDTranslateNormalMessage
+					{
+						SnapFacing = true,
+						AnimationTag = 69728,
+					});
+					if (!_straightPath)
+					{
+						var spread = PowerMath.GenerateSpreadPositions(wanderCenter, TargetPosition, 20f, 3);
+						TargetPosition = new[] { spread[0], spread[2] }.PickRandom();
+					}
+				}
+
+				if (_pullTimer.TimedOut)
+				{
+					_pullTimer = WaitSeconds(ScriptFormula(24));
+					if (User is Player player && player.GetLegendaryPowerValue(RanslorsFollyPowerSNO) > 0f)
+						foreach (var enemy in GetEnemiesInRadius(twister.Position, ScriptFormula(25)).Actors)
+							TryRanslorPull(enemy, twister.Position, ScriptFormula(25), ScriptFormula(26));
+				}
+
+				if (damageTimer != null && !damageTimer.TimedOut) return;
+				damageTimer = WaitSeconds(tickPeriod);
+				var attack = new AttackPayload(this);
+				attack.Targets = GetEnemiesInRadius(twister.Position, ScriptFormula(merged ? 6 : 7));
+				attack.AddWeaponDamage(_totalDamage * tickPeriod / duration, _damageType);
+				attack.OnHit = hit =>
+				{
+					if (_galeForce && !HasBuff<GaleForceDebuff>(hit.Target))
+						AddBuff(hit.Target, new GaleForceDebuff(ScriptFormula(23), WaitSeconds(ScriptFormula(22))));
 				};
 				attack.Apply();
 
-				if (Rune_E > 0) return;     //Wicked Wind
-
-				ActorMover _twisterMover = new ActorMover(Twister);
-
-				_twisterMover.Move(TargetPosition, ScriptFormula(18), new ACDTranslateNormalMessage
+				if (CastCount >= _mergeLimit) return;
+				var partner = FindRagingStormPartner(twister, twister.GetActorsInRange<EffectActor>(5f));
+				if (partner == null || !TryAbsorb((EnergyTwister)partner.Context, ScriptFormula(2), ScriptFormula(4))) return;
+				partner.Destroy();
+				if (!merged)
 				{
-					SnapFacing = true,
-					AnimationTag = 69728,
-				});
-				TargetPosition = PowerMath.GenerateSpreadPositions(Twister.Position, TargetPosition, 20f, 3).PickRandom();
-
-				if (Rune_B > 0)     //Raging Storm
+					var mergePosition = new Vector3D(twister.Position);
+					twister.Destroy();
+					SpawnTornado(mergePosition);
+				}
+				else
 				{
-					var twisters = Twister.GetActorsInRange<EffectActor>(5f)
-						.Where(i => i.SNO == ActorSno._wizard_tornado && i != Twister)
-						.ToArray();
-					
-					if (twisters.Length > 0)
-					{
-						foreach (var twist in twisters)
-							twist.Destroy();
-
-						var bigMultiplier = ScriptFormula(2) * 0.5f / ScriptFormula(4);
-
-						var bigTwister = new EffectActor(this, ActorSno._wizard_tornado_big, Twister.Position);
-						bigTwister.Timeout = WaitSeconds(ScriptFormula(4));
-						bigTwister.Scale = 1f;
-						bigTwister.Spawn();
-
-						bigTwister.UpdateDelay = 0.5f;
-						bigTwister.OnUpdate = () =>
-						{
-							ActorMover bigTwisterMover = new ActorMover(bigTwister);
-							bigTwisterMover.Move(TargetPosition, ScriptFormula(18), new ACDTranslateNormalMessage
-							{
-								SnapFacing = true,
-								AnimationTag = 69728,
-							});
-							TargetPosition = PowerMath.GenerateSpreadPositions(bigTwister.Position, TargetPosition, 20f, 3).PickRandom();
-							WeaponDamage(GetEnemiesInRadius(bigTwister.Position, 12f), bigMultiplier, DamageType.Arcane);
-						};
-						Twister.Destroy();
-					}
+					// Additional casts refresh the tornado and redirect it toward the latest cast.
+					// Keep its damage-tick phase; do not introduce an extra hit on each absorption.
+					mover = new ActorMover(twister);
+					wanderCenter = new Vector3D(twister.Position);
 				}
 			};
+		}
 
-			yield break;
+		private bool CanAbsorb(EnergyTwister other) =>
+			IsActive && other.IsActive && other.User == User && other.World == World &&
+			CastCount < _mergeLimit && other._mergeLimit > 1 && other.CastCount == 1 &&
+			other._firstCastId > _firstCastId;
+
+		internal Vector3D StraightPathDestination(Vector3D position, float distance)
+		{
+			if (PowerMath.Distance2D(position, TargetPosition) > 0f)
+				return PowerMath.TranslateDirection2D(position, TargetPosition, position, distance);
+			// A cast directly under the caster still needs a finite travel direction.
+			var facing = 2f * (float)Math.Atan2(User.RotationAxis.Z, User.RotationW);
+			return position + new Vector3D((float)Math.Cos(facing) * distance, (float)Math.Sin(facing) * distance, 0f);
+		}
+
+		internal bool CanRanslorPull(Actor enemy, Vector3D center, float radius)
+		{
+			if (enemy is not Monster monster || enemy.Dead || enemy.World != World ||
+				enemy.Quality != (int)DiIiS_NA.Core.MPQ.FileFormats.SpawnType.Normal ||
+				enemy.Attributes[GameAttributes.Immune_To_Knockback] ||
+				PowerMath.Distance2D(center, enemy.Position) > radius)
+				return false;
+			var size = ((DiIiS_NA.Core.MPQ.FileFormats.Monster)monster.Monster.Target).Size;
+			if (size != DiIiS_NA.Core.MPQ.FileFormats.Monster.MonsterSize.Standard &&
+				size != DiIiS_NA.Core.MPQ.FileFormats.Monster.MonsterSize.Ranged &&
+				size != DiIiS_NA.Core.MPQ.FileFormats.Monster.MonsterSize.Swarm)
+				return false;
+			return !World.BuffManager.GetBuffs<RanslorPullLockout>(enemy)
+				.Any(buff => buff.User == User && !buff.Timeout.TimedOut);
+		}
+
+		internal bool TryRanslorPull(Actor enemy, Vector3D center, float radius, float lockoutSeconds)
+		{
+			if (!CanRanslorPull(enemy, center, radius) || HasBuff<KnockbackBuff>(enemy)) return false;
+			if (!AddBuff(enemy, new KnockbackBuff(center))) return false;
+			AddBuff(enemy, new RanslorPullLockout { Timeout = WaitSeconds(lockoutSeconds) });
+			return true;
+		}
+
+		// Internal immunity shared by this Wizard's manual, Sigil and merged twisters.
+		// TimedBuff deliberately publishes no invented client buff icon.
+		internal class RanslorPullLockout : TimedBuff
+		{
+			public override void Init() { PowerSNO = 0; }
+			public override bool Stack(Buff buff) => false; // Each Wizard owns its own lockout.
+		}
+
+		internal bool TryAbsorb(EnergyTwister other, float ragingStormDamage, float duration)
+		{
+			if (!CanAbsorb(other)) return false;
+			// Live 2.6.10 measurements: the first pair deals 3200%; each subsequent cast
+			// adds its normal damage (835% Wicked Wind, 1525% for the other runes).
+			_totalDamage = CastCount == 1 ? ragingStormDamage : _totalDamage + other._totalDamage;
+			CastCount++;
+			other.CastCount = 0;
+			TargetPosition = new Vector3D(other._castAim);
+			ActiveTwister.Timeout = WaitSeconds(duration);
+			return true;
+		}
+
+		internal static EffectActor FindRagingStormPartner(EffectActor twister, IEnumerable<EffectActor> nearby)
+		{
+			var parent = (EnergyTwister)twister.Context;
+			// Keep the original cast order after replacing the actor with the large tornado.
+			// The parent context also keeps its manual/item-proc provenance and selected rune.
+			return nearby.Where(other => other.Context is EnergyTwister candidate &&
+				candidate.ActiveTwister == other && parent.CanAbsorb(candidate))
+				.OrderBy(other => ((EnergyTwister)other.Context)._firstCastId).FirstOrDefault();
 		}
 
 		[ImplementsPowerBuff(2)]
@@ -1361,6 +1463,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 	[ImplementsPowerSNO(SkillsSystem.Skills.Wizard.Offensive.Disintegrate)]
 	public class WizardDisintegrate : ChanneledSkill
 	{
+		protected override int GetChannelTickFrames() => (int)(60f * ScriptFormula(18));
 		const float BeamLength = 40f;
 		private Actor _target = null;
 		private void _calcTargetPosition()
@@ -1373,7 +1476,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 
 		public override void OnChannelOpen()
 		{
-			EffectsPerSecond = 0.3f;
+			EffectsPerSecond = ScriptFormula(18);
 
 			_calcTargetPosition();
 			if (Rune_C <= 0)
@@ -1409,7 +1512,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 
 		public override IEnumerable<TickTimer> Main()
 		{
-			UsePrimaryResource(ScriptFormula(20));
+			UsePrimaryResource(ScriptFormula(22), 1f / ScriptFormula(3));
 
 			if (Rune_C > 0)         //Entropy
 			{
@@ -1761,11 +1864,34 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 	[ImplementsPowerSNO(SkillsSystem.Skills.Wizard.Offensive.ArcaneTorrent)]
 	public class WizardArcaneTorrent : ChanneledSkill
 	{
+		protected override int GetChannelTickFrames() => (int)(60f * ScriptFormula(10));
 		private Actor _targetProxy = null;
-		//private Actor _userProxy = null;
+		private FlameWardBuff _flameWard;
+		internal DamageType ChannelDamageType => Rune_A > 0 ? DamageType.Fire : DamageType.Arcane;
+		private void ClampTargetPosition()
+		{
+			TargetPosition = PowerMath.TranslateDirection2D(User.Position, TargetPosition, User.Position,
+				Math.Min(PowerMath.Distance2D(User.Position, TargetPosition), 50f));
+		}
+
+		private void UpdateTargetProxy()
+		{
+			// This is an aim marker, not a moving projectile. Publish its exact position
+			// before playing a volley so the effect and its damage use the same location.
+			_targetProxy.Position = new Vector3D(TargetPosition);
+			World.BroadcastIfRevealed(_targetProxy.ACDWorldPositionMessage, _targetProxy);
+		}
 		public override void OnChannelOpen()
 		{
-			EffectsPerSecond = 0.3f;
+			// The power's tick period: 1 / (attack speed * tick multiplier), the multiplier being 3, 2 for Death Blossom
+			// and 1.5 for Arcane Mines
+			EffectsPerSecond = ScriptFormula(10);
+			ClampTargetPosition();
+			if (Rune_A > 0)
+			{
+				_flameWard = new FlameWardBuff(this, ScriptFormula(5), ScriptFormula(6), (int)ScriptFormula(7));
+				AddBuff(User, _flameWard);
+			}
 
 			_targetProxy = SpawnEffect(
 				RuneSelect(
@@ -1784,24 +1910,28 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 		public override void OnChannelClose()
 		{
 			_targetProxy.Destroy();
+			if (_flameWard != null) World.BuffManager.RemoveBuff(User, _flameWard);
 		}
 		public override void OnChannelUpdated()
 		{
-
+			ClampTargetPosition();
+			User.TranslateFacing(TargetPosition);
+			if (Rune_E <= 0) UpdateTargetProxy();
 		}
 		public override IEnumerable<TickTimer> Main()
 		{
-			UsePrimaryResource(ScriptFormula(22));
+			UsePrimaryResource(ScriptFormula(30), 1f / ScriptFormula(1));
 
-			TargetPosition = PowerMath.TranslateDirection2D(User.Position, TargetPosition, User.Position, Math.Min(PowerMath.Distance2D(User.Position, TargetPosition), 50f));
+			ClampTargetPosition();
 			if (Rune_E > 0)         //Death Blossom
 				TargetPosition = RandomDirection(User.Position, 5f, 25f);
 
+			UpdateTargetProxy();
 			AddBuff(User, new CastEffect());
 			var userProxy = SpawnProxy(User.Position, WaitInfinite());
 			userProxy.PlayEffectGroup(RuneSelect(134442, 170263, 170264, 170569, 170572, 164077), _targetProxy);
 
-			Vector3D laggyPosition = new Vector3D(TargetPosition);
+			Vector3D impactPosition = new Vector3D(_targetProxy.Position);
 
 			if (Rune_C > 0)         //Arcane Mines
 			{
@@ -1840,24 +1970,17 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 					}
 				};
 				mine.Spawn();
+				userProxy.Destroy();
 				yield break;
 			}
 
-			//yield return WaitSeconds(0.8f);
-			// update proxy target delayed so animation lines up with explosions a bit better
-			if (IsChannelOpen)
-				TranslateEffect(_targetProxy, laggyPosition, 8f);
-
 			AttackPayload attack = new AttackPayload(this);
-			attack.Targets = GetEnemiesInRadius(laggyPosition, 5f);
-			attack.AddWeaponDamage((Rune_E > 0 ? ScriptFormula(17) : ScriptFormula(0)) * EffectsPerSecond * User.Attributes[GameAttributes.Attacks_Per_Second_Total], DamageType.Arcane);
+			attack.Targets = GetEnemiesInRadius(impactPosition, 5f);
+			var channelDamage = (Rune_E > 0 ? ScriptFormula(17) : ScriptFormula(0)) +
+				Math.Min(ChannelSeconds, (int)ScriptFormula(40)) * (Rune_E > 0 ? ScriptFormula(42) : ScriptFormula(41));
+			attack.AddWeaponDamage(channelDamage * EffectsPerSecond * User.Attributes[GameAttributes.Attacks_Per_Second_Total], ChannelDamageType);
 			attack.OnHit = hitPayload =>
 			{
-				if (Rune_A > 0)         //Disruption
-				{
-					if (!HasBuff<Crimson_DestablizedEffect>(hitPayload.Target))
-						AddBuff(hitPayload.Target, new Crimson_DestablizedEffect());
-				}
 				if (Rune_B > 0 && Rand.NextDouble() < ScriptFormula(12))        //Cascade
 				{
 					var cascadeTarget = GetEnemiesInRadius(hitPayload.Target.Position, ScriptFormula(24)).Actors.FirstOrDefault(i => i != hitPayload.Target);
@@ -1897,25 +2020,6 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 			{
 				if (Rune_C > 0) Timeout = WaitSeconds(0.6f);
 				else Timeout = WaitSeconds(0.3f);
-			}
-		}
-		[ImplementsPowerBuff(1)]
-		class Crimson_DestablizedEffect : PowerBuff
-		{
-			public override void Init()
-			{
-				Timeout = WaitSeconds(ScriptFormula(6));
-			}
-
-			public override void OnPayload(Payload payload)
-			{
-				if (payload.Target == Target && payload is HitPayload)
-				{
-					if ((payload as HitPayload).DominantDamageType == DamageType.Arcane)
-					{
-						(payload as HitPayload).TotalDamage *= (1f + ScriptFormula(5));
-					}
-				}
 			}
 		}
 	}
@@ -2208,6 +2312,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 	[ImplementsPowerSNO(SkillsSystem.Skills.Wizard.Offensive.RayOfFrost)]
 	public class WizardRayOfFrost : ChanneledSkill
 	{
+		protected override int GetChannelTickFrames() => (int)(60f * ScriptFormula(15));
 		const float MaxBeamLength = 40f;
 		private Actor _beamEnd;
 
@@ -2220,7 +2325,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 
 		public override void OnChannelOpen()
 		{
-			EffectsPerSecond = 0.3f;
+			EffectsPerSecond = ScriptFormula(15);
 
 			if (Rune_B > 0)
 			{
@@ -2272,8 +2377,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 		public override IEnumerable<TickTimer> Main()
 		{
 			// Rune_D resource mod calculated in SF_19
-			// SF19 is divided by 2 so multiply by 2 here
-			UsePrimaryResource(ScriptFormula(19) * 2f);
+			UsePrimaryResource(ScriptFormula(19), 1f / ScriptFormula(16));
 
 			AttackPayload attack = new AttackPayload(this);
 			if (Rune_B > 0)         //Sleet Storm
@@ -2423,15 +2527,20 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 					OrigTele.PlayEffectGroup(RuneSelect(170231, 205685, 205684, 191913, 192074, 192151));
 					OrigTele.PlayEffectGroup(206679);
 					AddBuff(User, new TeleRevertBuff(OrigSpot, OrigTele));
-					yield return WaitSeconds(0.3f);
 					User.Teleport(TargetPosition);
 					User.PlayEffectGroup(RuneSelect(170232, 170232, 170232, 192053, 192080, 192152));
 				}
 				yield break;
 			}
 
+			// The first teleport moves right away (the power's only delay, Script Formula 0's 0.4 s, is for the effects
+			// after it). A Wormhole follow-up, cast while the first one's TeleCoolDownBuff is on, moves after 0.3 s.
+			var wormhole = Rune_E > 0 ? World.BuffManager.GetFirstBuff<TeleCoolDownBuff>(User) : null;
+			// Consume the single additional cast before yielding; removal starts the cooldown.
+			if (wormhole != null) World.BuffManager.RemoveBuff(User, wormhole);
 			SpawnProxy(User.Position).PlayEffectGroup(RuneSelect(170231, 205685, 205684, 191913, 192074, 192151));  // alt cast efg: 170231
-			yield return WaitSeconds(0.3f);
+			if (wormhole != null)
+				yield return WaitSeconds(0.3f);
 			User.Teleport(TargetPosition);
 			User.PlayEffectGroup(RuneSelect(170232, 170232, 170232, 192053, 192080, 192152));
 
@@ -2476,7 +2585,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 			if (Rune_C > 0 && !HasBuff<TeleDmgReductionBuff>(User))     //Safe Passage
 				AddBuff(User, new TeleDmgReductionBuff());
 
-			if (Rune_E > 0 && !HasBuff<TeleCoolDownBuff>(User))         //Wormhole
+			if (Rune_E > 0 && wormhole == null)         //Wormhole
 				AddBuff(User, new TeleCoolDownBuff());
 		}
 		[ImplementsPowerBuff(1)]
@@ -2994,7 +3103,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 			}
 		}
 		[ImplementsPowerBuff(3)]
-		class GoldenBuff : PowerBuff        //Power of the Storm
+		internal class GoldenBuff : PowerBuff        //Power of the Storm
 		{
 			public override void Init()
 			{
@@ -3045,7 +3154,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 			public override void Init()
 			{
 				Timeout = WaitSeconds(ScriptFormula(5));    //Rune B Enduring Skin included here
-				HPTreshold = User.Attributes[GameAttributes.Hitpoints_Max_Total] * (Rune_C > 0 ? 0.6f : 0.3f);
+				HPTreshold = User.Attributes[GameAttributes.Hitpoints_Max_Total] * (Rune_C > 0 ? 0.6f : 0.3f) * EquippedLegendaryPowers.ShieldMultiplier(User);
 			}
 
 			public override bool Apply()
@@ -3346,6 +3455,16 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 	[ImplementsPowerSNO(SkillsSystem.Skills.Wizard.Utility.MagicWeapon)]
 	public class MagicWeapon : Skill
 	{
+		internal static void OnCast(PowerContext cast)
+		{
+			if (cast.IsItemProc || cast.User is not Player) return;
+			// Teleport's IsOffensive tag also covers its non-damaging runes; only Calamity attacks.
+			if (cast.PowerSNO == SkillsSystem.Skills.Wizard.Utility.Teleport && cast.Rune_A <= 0) return;
+			var buff = cast.World.BuffManager.GetFirstBuff<MagicWeaponBuff>(cast.User);
+			if (buff == null || buff.Rune_E <= 0 || cast.EvalTag(PowerKeys.IsOffensive) <= 0) return;
+			buff.TryCreateShield(buff.ScriptFormula(12), buff.ScriptFormula(13));
+		}
+
 		public override IEnumerable<TickTimer> Main()
 		{
 			StartCooldown(EvalTag(PowerKeys.CooldownTime));
@@ -3358,6 +3477,16 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 		[ImplementsPowerBuff(0)]
 		class MagicWeaponBuff : PowerBuff
 		{
+			private int _nextShieldTick;
+			internal void TryCreateShield(float lifeFraction, float duration)
+			{
+				int now = World.Game.TickCounter;
+				if (now < _nextShieldTick) return;
+				_nextShieldTick = now + Math.Max(1, (int)Math.Ceiling(60f / User.Attributes[GameAttributes.Attacks_Per_Second_Total]));
+				var amount = User.Attributes[GameAttributes.Hitpoints_Max_Total] * lifeFraction * EquippedLegendaryPowers.ShieldMultiplier(User);
+				AddBuff(User, new DeflectionBuff(amount, WaitSeconds(duration)));
+			}
+
 			bool ElectrifyReady = false;
 			int ElectrifiesDone = 0;
 			const int ElectrifiesCap = 3;
@@ -3476,9 +3605,6 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 					if (Rune_D > 0 && Rand.NextDouble() < lastAttack.Context.GetProcCoefficient())      //Conduit
 						GeneratePrimaryResource(ScriptFormula(11));
 
-					if (Rune_E > 0 && !HasBuff<DeflectionBuff>(User))       //Deflection
-						if (Rand.NextDouble() < lastAttack.Context.GetProcCoefficient())
-							AddBuff(User, new DeflectionBuff(User.Attributes[GameAttributes.Hitpoints_Max_Total] * 0.04f, WaitSeconds(ScriptFormula(13))));
 				}
 			}
 		}
@@ -3541,40 +3667,78 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 			}
 		}
 
-		[ImplementsPowerBuff(2)]
-		public class DeflectionBuff : PowerBuff
+		// Deflection shields have independent three-second lifetimes; there is no fixed stack cap.
+		public class DeflectionBuff : Buff
 		{
-			public float HPTreshold = 0f;
-			public DeflectionBuff(float hpTreshold, TickTimer timeout)
-			{
-				HPTreshold = hpTreshold;
-				Timeout = timeout;
-			}
+			private readonly List<(float Amount, TickTimer Timeout)> _shields = new List<(float, TickTimer)>();
+			public DeflectionBuff(float amount, TickTimer timeout) => _shields.Add((amount, timeout));
 
+			// The parent Magic Weapon buff owns the client icon. This tracks shield capacity only.
+			public override void Init() => PowerSNO = 0;
 			public override bool Apply()
 			{
-				if (!base.Apply())
-					return false;
-
-				//Target.Attributes.BroadcastChangedIfRevealed();
+				ChangeDisplayedAmount(_shields[0].Amount);
 				return true;
 			}
+
+			public override bool Stack(Buff buff)
+			{
+				ExpireShields();
+				var shield = ((DeflectionBuff)buff)._shields[0];
+				_shields.Add(shield);
+				ChangeDisplayedAmount(shield.Amount);
+				return true;
+			}
+
+			public override bool Update()
+			{
+				ExpireShields();
+				return _shields.Count == 0;
+			}
+
+			private void ExpireShields()
+			{
+				float expired = 0f;
+				for (int i = _shields.Count - 1; i >= 0; i--)
+					if (_shields[i].Timeout.TimedOut)
+					{
+						expired += _shields[i].Amount;
+						_shields.RemoveAt(i);
+					}
+				if (expired > 0f) ChangeDisplayedAmount(-expired);
+			}
+
 			public override void OnPayload(Payload payload)
 			{
-				if (HPTreshold > 0)
-					if (payload is HitPayload && payload.Target == User && (payload as HitPayload).IsWeaponDamage)
-					{
-						float dmg = (payload as HitPayload).TotalDamage;
-						(payload as HitPayload).TotalDamage -= Math.Min((payload as HitPayload).TotalDamage, HPTreshold);
-						HPTreshold -= dmg;
-						if (HPTreshold < 0f)
-							User.World.BuffManager.RemoveBuff(User, this);
-					}
+				if (payload is not HitPayload hit || payload.Target != Target || hit.TotalDamage <= 0f) return;
+				ExpireShields();
+				float absorbed = 0f;
+				for (int i = 0; i < _shields.Count && hit.TotalDamage > 0f;)
+				{
+					var shield = _shields[i];
+					float amount = Math.Min(shield.Amount, hit.TotalDamage);
+					hit.TotalDamage -= amount;
+					absorbed += amount;
+					shield.Amount -= amount;
+					if (shield.Amount <= 0f) _shields.RemoveAt(i);
+					else { _shields[i] = shield; i++; }
+				}
+				if (absorbed > 0f) ChangeDisplayedAmount(-absorbed);
+				if (_shields.Count == 0) World.BuffManager.RemoveBuff(Target, this);
 			}
+
+			private void ChangeDisplayedAmount(float delta)
+			{
+				Target.Attributes[GameAttributes.Damage_Shield_Amount] =
+					Math.Max(0f, Target.Attributes[GameAttributes.Damage_Shield_Amount] + delta);
+				Target.Attributes.BroadcastChangedIfRevealed();
+			}
+
 			public override void Remove()
 			{
+				ChangeDisplayedAmount(-_shields.Sum(shield => shield.Amount));
+				_shields.Clear();
 				base.Remove();
-				//Target.Attributes.BroadcastChangedIfRevealed();
 			}
 		}
 	}

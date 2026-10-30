@@ -109,39 +109,47 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 		}
 	}
 	[ImplementsPowerSNO(208541)]
-	[ImplementsPowerBuff(2)]
+	[ImplementsPowerBuff(1)] // Installed Wizard_Passive_GalvanizingWard Buff1Icon.
 	class GalvShieldBuff : PowerBuff
 	{
 		float HPTreshold = 0f;
+		internal float RemainingAbsorption => Math.Max(0f, HPTreshold);
 
 		public override void Init()
 		{
 			Timeout = WaitSeconds(300f);
-			HPTreshold = User.Attributes[GameAttributes.Hitpoints_Max_Total] * 0.6f;
+			HPTreshold = User.Attributes[GameAttributes.Hitpoints_Max_Total] * 0.6f * EquippedLegendaryPowers.ShieldMultiplier(User);
 		}
 		public override bool Apply()
 		{
 			if (!base.Apply())
 				return false;
 
+			ChangeDisplayedAmount(HPTreshold);
 			return true;
+		}
+
+		private void ChangeDisplayedAmount(float delta)
+		{
+			Target.Attributes[GameAttributes.Damage_Shield_Amount] = Math.Max(0f,
+				Target.Attributes[GameAttributes.Damage_Shield_Amount] + delta);
+			Target.Attributes.BroadcastChangedIfRevealed();
 		}
 
 		public override void OnPayload(Payload payload)
 		{
-			if (payload.Target == Target && payload is HitPayload &&
-				(payload as HitPayload).IsWeaponDamage && HPTreshold > 0)
-			{
-				float dmg = (payload as HitPayload).TotalDamage;
-				(payload as HitPayload).TotalDamage -= Math.Min((payload as HitPayload).TotalDamage, HPTreshold);
-				HPTreshold -= dmg;
-				if (HPTreshold <= 0)
-					User.World.BuffManager.RemoveBuff(User, this);
-			}
+			if (Removed || Timeout.TimedOut || payload.Target != Target || payload is not HitPayload hit || hit.TotalDamage <= 0) return;
+			float absorbed = Math.Min(hit.TotalDamage, HPTreshold);
+			hit.TotalDamage -= absorbed;
+			HPTreshold -= absorbed;
+			ChangeDisplayedAmount(-absorbed);
+			if (HPTreshold <= 0) World.BuffManager.RemoveBuff(Target, this);
 		}
 
 		public override void Remove()
 		{
+			ChangeDisplayedAmount(-HPTreshold);
+			HPTreshold = 0;
 			base.Remove();
 		}
 	}
@@ -158,7 +166,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 			base.Init();
 			Timeout = WaitSeconds(ScriptFormula(0));
 			MaxStackCount = 10;
-			HPTreshold = User.Attributes[GameAttributes.Hitpoints_Max_Total] * 0.02f;
+			HPTreshold = User.Attributes[GameAttributes.Hitpoints_Max_Total] * 0.02f * EquippedLegendaryPowers.ShieldMultiplier(User);
 		}
 
 		public override bool Apply()
@@ -172,7 +180,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 			base.Stack(buff);
 
 			if (!stacked) return true;
-			HPTreshold = User.Attributes[GameAttributes.Hitpoints_Max_Total] * 0.02f * StackCount;
+			HPTreshold = User.Attributes[GameAttributes.Hitpoints_Max_Total] * 0.02f * StackCount * EquippedLegendaryPowers.ShieldMultiplier(User);
 			Extend(30);
 
 			return true;

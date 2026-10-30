@@ -258,6 +258,8 @@ namespace DiIiS_NA
 
                 IChannel boundChannel = await serverBootstrap.BindAsync(loginConfig.Port);
 
+                DiIiS_NA.GameServer.GSSystem.PowerSystem.CombatMeter.Start();
+
                 Logger.Info("$[bold deeppink4]$Gracefully$[/]$ shutdown with $[red3_1]$CTRL+C$[/]$ or $[deeppink4]$!q[uit]$[/]$.");
                 Logger.Info("{0}", IsCancellationRequested());
                 while (!IsCancellationRequested())

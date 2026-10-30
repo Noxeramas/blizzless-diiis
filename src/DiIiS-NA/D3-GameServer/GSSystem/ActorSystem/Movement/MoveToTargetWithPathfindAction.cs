@@ -20,6 +20,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 		private int PrioritySkillSNO = -1;
 
 		private TickTimer Timer;
+		private WalkStep _step;
 		private bool Stucked = true;
 		private bool Canceled = false;
 
@@ -75,7 +76,6 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 		private void Move()
 		{
 			Stucked = true;
-			Vector3D defaultPosition = Owner.Position;
 			Vector3D destPoint = PowerMath.TranslateDirection2D(Owner.Position, Target.Position, Owner.Position, Math.Min(MovementHelpers.GetDistance(Owner.Position, Target.Position), Owner.WalkSpeed * 30));
 			//int searchLimit = 0;
 			var points = PowerMath.GenerateSpreadPositions(Owner.Position, destPoint, 30f, 6).OrderBy((pos) => MovementHelpers.GetDistance(pos, destPoint)).ToList();
@@ -118,11 +118,15 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 				destPoint = MovementHelpers.OnGround(Owner.World, destPoint);
 				Owner.Move(destPoint, MovementHelpers.GetFacingAngle(Owner, destPoint));
 				_lastDelay = (int)(MovementHelpers.GetDistance(Owner.Position, destPoint) / (Owner.WalkSpeed));
+				_step = new WalkStep(Owner, destPoint);
 
 				//Logger.Trace("Delay in step: {0}", _lastDelay);
 			}
 			else
+			{
 				_lastDelay = 60;
+				_step = null;
+			}
 
 			Timer = TickTimer.WaitTicks(
 				Owner.World.Game,
@@ -130,10 +134,9 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 				(tick) =>
 				{
 					if (Canceled) return;
-					if (!Stucked && Owner.WalkSpeed > 0f)
-					{
-						Owner.Position = MovementHelpers.OnGround(Owner.World, MovementHelpers.GetMovementPosition(defaultPosition, Owner.WalkSpeed, MovementHelpers.GetFacingAngle(Owner.Position, destPoint), _lastDelay));
-					}
+					// The client finishes the walk at the speed it was sent, even if the walk speed has dropped since
+					// (a get-hit pause sets it to 0).
+					_step?.Finish();
 
 					if (Owner == null ||
 						Owner.Attributes[GameAttributes.Hitpoints_Cur] == 0 ||
@@ -167,6 +170,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 
 		public override void Update(int tickCounter)
 		{
+			_step?.Follow();
 			if (Timer != null)
 				Timer.Update(tickCounter);
 		}
@@ -175,6 +179,8 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 		{
 			Done = true;
 			Canceled = true;
+			// stop the client where the monster is now, not where its last step began
+			_step?.Follow();
 			Owner.World.BroadcastIfRevealed(Owner.ACDWorldPositionMessage, Owner);
 			//this.Owner.Position = MovementHelpers.GetMovementPosition(this.Owner.Position, this.Owner.WalkSpeed, Movement.MovementHelpers.GetFacingAngle(this.Owner.Position, this.Owner.CurrentDestination), (int)(_lastDelay / 16f));
 		}

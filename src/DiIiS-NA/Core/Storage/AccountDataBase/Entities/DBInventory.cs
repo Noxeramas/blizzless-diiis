@@ -17,6 +17,10 @@ namespace DiIiS_NA.Core.Storage.AccountDataBase.Entities
 		public virtual int FirstGem { get; set; }
 		public virtual int SecondGem { get; set; }
 		public virtual int ThirdGem { get; set; }
+		// Legendary gem ranks (Jewel_Rank) of the socketed gems
+		public virtual int FirstGemRank { get; set; }
+		public virtual int SecondGemRank { get; set; }
+		public virtual int ThirdGemRank { get; set; }
 		public virtual int Version { get; set; }
 		public virtual int GbId { get; set; }
 		public virtual int Count { get; set; }

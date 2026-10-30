@@ -37,7 +37,7 @@ namespace DiIiS_NA.GameServer.MessageSystem.Message.Definitions.Tick
             b.Append(' ', pad++);
             b.AppendLine("{");
             b.Append(' ', pad);
-            //b.AppendLine("Tick: 0x" + Tick.ToString("X8") + " (" + Tick + ")");
+            b.AppendLine("Tick: 0x" + Tick.ToString("X8") + " (" + Tick + ")");
             b.Append(' ', --pad);
             b.AppendLine("}");
 

@@ -26,7 +26,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 			return Evaluate(script, irh, out result, out minValue, out maxValue);
 		}
 
-		public static bool Evaluate(int[] script, ItemRandomHelper irh, out float result, out float minValue, out float maxValue)
+		public static bool Evaluate(int[] script, ItemRandomHelper irh, out float result, out float minValue, out float maxValue, bool? maximize = null)
 		{
 			result = 0;
 			Stack<float> stack = new Stack<float>(64);
@@ -60,7 +60,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 								numb2 = stack.Pop();
 								numb1 = minValue = stack.Pop();
 								maxValue = numb1 + numb2;
-								stack.Push(irh.Next(numb1, numb1 + numb2));
+								stack.Push(maximize.HasValue ? (maximize.Value ? maxValue : minValue) : irh.Next(numb1, numb1 + numb2));
 								break;
 							case 4:
 								if (stack.Count < 2)
@@ -70,7 +70,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 								}
 								numb2 = maxValue = stack.Pop();
 								numb1 = minValue = stack.Pop();
-								stack.Push(irh.Next(numb1, numb2));
+								stack.Push(maximize.HasValue ? (maximize.Value ? maxValue : minValue) : irh.Next(numb1, numb2));
 								break;
 							default:
 								Logger.Error("Unimplemented function");

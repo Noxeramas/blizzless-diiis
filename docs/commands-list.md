@@ -23,7 +23,8 @@
 | Materials command       | `materials` | `!materials 500`         | Adds that many of every crafting material (default 100)        |
 | Blood shards command    | `shards`    | `!shards 500`            | Adds blood shards to gamble with Kadala (default 100)          |
 | Loot pool command       | `lootpool`  | `!lootpool Boots`        | Lists the legendaries an item type can roll for your class     |
-| Item command            | `item`      | `!item p71_ethereal_10`  | Get any Item by Name see the file items-identification-doc.md  |
+| Item command            | `item`      | `!item P61_Unique_Boots_01 2 ancient` | Spawns an item by its internal name (up to 100), with its random affixes for your class; `ancient` makes level 70 legendaries ancient. items-identification-doc.md lists some names, though many are old versions |
+|                         |             | `!item Unique_Gem_023_x1 rank 99` | `rank` sets a legendary gem's rank (Unique_Gem_001_x1 to Unique_Gem_023_x1; 023 is Legacy of Dreams) |
 | Teleport command        | `tp`        | `!tp 71150`              | Teleport character to World by ID                              |
 | SpeedHack command       | `speed`     | `!speed 2`               | Increase you speed character                                   |
 | Lookup Command          | `lookup`    | `!lookup item axe`       | Display all founded in game objects with entered text in Name  |
@@ -121,9 +122,9 @@ Platinum for your character.
 Optionally specify the number of levels: !eff [count]
 
 ### !item
-Spawns an item (with a name or type).
+Spawns an item (with a name or type), rolled for your class.
 
-Usage: item [type <type>|<name>] [amount]
+Usage: item [type <type>|<name>] [amount] [ancient] [rank <rank>]
 
 ### !drop
 Drops an epic item for your class.

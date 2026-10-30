@@ -485,6 +485,9 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 		/// </summary>
 		public void Update()
 		{
+			var gameWatch = Stopwatch.StartNew();
+			long nextMeterSnapshot = 0;
+			var schedule = new GameUpdateSchedule(UpdateFrequency, TickRate);
 			while (Working)
 			{
 				Stopwatch tickWatch = new Stopwatch();
@@ -498,10 +501,8 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 				}
 
 
-				Interlocked.Add(ref _tickCounter,
-					(TickRate +
-					 MissedTicks)); // +6 ticks per 100ms. Verified by setting LogoutTickTimeMessage.Ticks to 600 which eventually renders a 10 sec logout timer on client. /raist
-				MissedTicks = 0;
+				// Include time spent sleeping or descheduled, not just time spent updating worlds.
+				Interlocked.Add(ref _tickCounter, schedule.Advance(gameWatch.ElapsedMilliseconds));
 
 				if (!Paused)
 				{
@@ -528,15 +529,15 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 					}
 				}
 
+				if (gameWatch.ElapsedMilliseconds >= nextMeterSnapshot)
+				{
+					nextMeterSnapshot = gameWatch.ElapsedMilliseconds + 250;
+					lock (_updateLock)
+						PowerSystem.CombatMeter.CapturePlayers(Players.Values, Paused);
+				}
+
 				tickWatch.Stop();
 				RecordUpdateTime(tickWatch.Elapsed.TotalMilliseconds);
-
-				Stopwatch calcWatch = new();
-				calcWatch.Start();
-				var compensation =
-					(int)(UpdateFrequency -
-					      tickWatch
-						      .ElapsedMilliseconds); // the compensation value we need to sleep in order to get consistent 100 ms Game.Update().
 
 				if (tickWatch.ElapsedMilliseconds > UpdateFrequency)
 				{
@@ -555,14 +556,10 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 						Logger.Trace(
 							$"took [{tickWatch.ElapsedMilliseconds}ms] more than Game.UpdateFrequency [{UpdateFrequency}ms].");
 					}
-
-					compensation = (int)(UpdateFrequency - (tickWatch.ElapsedMilliseconds % UpdateFrequency));
-					MissedTicks = TickRate * (int)(tickWatch.ElapsedMilliseconds / UpdateFrequency);
 				}
 
-				calcWatch.Stop();
-				Thread.Sleep(Math.Max(0,
-					compensation - (int)calcWatch.ElapsedMilliseconds)); // sleep until next Update().
+				// An absolute deadline prevents small sleep overruns from accumulating into clock drift.
+				Thread.Sleep(schedule.Delay(gameWatch.ElapsedMilliseconds));
 			}
 		}
 

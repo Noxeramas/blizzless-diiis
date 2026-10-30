@@ -20,6 +20,14 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 		private float _height;
 		private float _gravity;
 		private ActorMover _mover;
+		private Vector3D _destination;
+
+		// Pixel pulls must land at the center, rather than at a radius from it.
+		public KnockbackBuff(Vector3D destination, float arcHeight = 3.0f, float arcGravity = -0.03f)
+			: this(0f, arcHeight, arcGravity)
+		{
+			_destination = new Vector3D(destination);
+		}
 
 		public KnockbackBuff(float magnitude, float arcHeight = 3.0f, float arcGravity = -0.03f)
 		{
@@ -30,14 +38,13 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Implementations
 
 		public override bool Apply()
 		{
-			if (!base.Apply())
-				return false;
-
-			Vector3D destination = PowerMath.TranslateDirection2D(User.Position, Target.Position,
+			Vector3D destination = _destination ?? PowerMath.TranslateDirection2D(User.Position, Target.Position,
 																   _magnitude < 0f ? User.Position : Target.Position,
 																   (float)Math.Sqrt(Math.Abs(_magnitude)));
 
 			if (!World.CheckLocationForFlag(destination, DiIiS_NA.Core.MPQ.FileFormats.Scene.NavCellFlags.AllowWalk))
+				return false;
+			if (!base.Apply())
 				return false;
 
 			_mover = new ActorMover(Target);

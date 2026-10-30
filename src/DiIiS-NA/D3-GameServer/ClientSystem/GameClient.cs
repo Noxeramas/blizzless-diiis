@@ -7,6 +7,7 @@ using DiIiS_NA.GameServer.MessageSystem.Message.Definitions.Tick;
 using DiIiS_NA.LoginServer.Battle;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -23,10 +24,12 @@ namespace DiIiS_NA.GameServer.ClientSystem
 		public IConnection Connection { get; set; }
 		public BattleClient BnetClient { get; set; }
 
-		//private readonly GameBitBuffer _incomingBuffer = new GameBitBuffer(512);
+		private readonly GameBitBuffer _incomingBuffer = new(512);
 		private readonly GameBitBuffer _outgoingBuffer = new(ushort.MaxValue);
 
 		private readonly object _clientStreamLock = new object();
+		private readonly Queue<(byte[] Data, long Received)> _incomingData = new();
+		private bool _parsing;
 
 		public Game Game { get; set; }
 		public Player Player { get; set; }
@@ -50,71 +53,113 @@ namespace DiIiS_NA.GameServer.ClientSystem
 
 		public virtual void Parse(ConnectionDataEventArgs e)
 		{
-			//lock (_clientStreamLock)
-			//{
-			Task.Run(() =>
+			var received = Stopwatch.GetTimestamp();
+			// The socket starts its next read as soon as this method returns. Own the bytes now,
+			// and use one worker so delayed packets cannot overtake one another.
+			var data = e.Data.ToArray();
+			lock (_clientStreamLock)
 			{
+				_incomingData.Enqueue((data, received));
+				if (_parsing) return;
+				_parsing = true;
+			}
+			Task.Run(ParseIncoming);
+		}
+
+		private void ParseIncoming()
+		{
+			while (true)
+			{
+				(byte[] Data, long Received) incoming;
 				lock (_clientStreamLock)
 				{
-					var cancelToken = new CancellationTokenSource();
-					//Task.Delay(5000, cancelToken.Token).ContinueWith((task) => { Logger.Warn("Character {0} caused server CPU overload!", this.Player.Toon.Name); this.Game.Dispose(); }, TaskContinuationOptions.NotOnCanceled);
-					try
+					if (_incomingData.Count == 0 || !Connection.IsOpen())
 					{
-						GameBitBuffer incomingBuffer = new(512);
-
-						incomingBuffer.AppendData(e.Data.ToArray());
-
-						while (Connection.IsOpen() && incomingBuffer.IsPacketAvailable())
-						{
-							int end = incomingBuffer.Position;
-							end += incomingBuffer.ReadInt(32) * 8;
-
-							while ((end - incomingBuffer.Position) >= 9 && Connection.IsOpen())
-							{
-								var message = incomingBuffer.ParseMessage();
-								// Without a message class the message's length is unknown, so skip to the end of the packet;
-								// continuing would read its data as further messages.
-								if (message == null) break;
-								try
-								{
-									Logger.LogIncomingPacket(message); // change ConsoleTarget's level to Level.Dump in program.cs if u want to see messages on console.
-									if (message.Id is 96 or 369 or 269)
-										message.Consumer = Consumers.Inventory;
-									if (message.Id is (int)Opcodes.TeleportToWaypoint or (int)Opcodes.GambleMessage)
-										message.Consumer = Consumers.Player;
-									if (message.Consumer != Consumers.None)
-									{
-										if (message.Consumer == Consumers.ClientManager) ClientManager.Instance.Consume(this, message); // Client should be greeted by ClientManager and sent initial game-setup messages.
-										else Game.Route(this, message);
-									}
-
-									else if (message is ISelfHandler handler) handler.Handle(this); // if message is able to handle itself, let it do so.
-									else if (message.Id != 217)
-										Logger.Warn("{0} - ID:{1} has no consumer or self-handler.", message.GetType().Name, message.Id);
-
-								}
-								catch (NotImplementedException)
-								{
-									Logger.Warn("Unhandled game message: 0x{0:X4} {1}", message.Id, message.GetType().Name);
-								}
-							}
-
-							incomingBuffer.Position = end;
-						}
-						incomingBuffer.ConsumeData();
-						//Thread.Sleep(5);
+						_incomingData.Clear();
+						_parsing = false;
+						return;
 					}
-					catch (Exception ex)
-					{
-						Logger.WarnException(ex, "Parse() exception: ");
-					}
-					finally
-					{
-						cancelToken.Cancel();
-					}
+					incoming = _incomingData.Dequeue();
 				}
-			});
-			//}
+
+				RecordWait(Stopwatch.GetElapsedTime(incoming.Received).TotalMilliseconds);
+				try
+				{
+					_incomingBuffer.AppendData(incoming.Data);
+					while (Connection.IsOpen() && _incomingBuffer.CheckAvailable(32))
+					{
+						int start = _incomingBuffer.Position;
+						int size = _incomingBuffer.ReadInt(32);
+						if (size < 4 || size > int.MaxValue / 8)
+							throw new GameBitBufferException($"Invalid packet size: {size}");
+						_incomingBuffer.Position = start;
+						if (!_incomingBuffer.CheckAvailable(size * 8)) break;
+						int end = start + size * 8;
+						_incomingBuffer.Position += 32;
+
+						while ((end - _incomingBuffer.Position) >= 10 && Connection.IsOpen())
+						{
+							var message = _incomingBuffer.ParseMessage();
+							// Without a message class its length is unknown; skip the rest of this packet.
+							if (message == null) break;
+							if (_incomingBuffer.Position > end)
+								throw new GameBitBufferException("Message exceeds its packet boundary.");
+							try
+							{
+								Logger.LogIncomingPacket(message);
+								if (message.Id is 96 or 369 or 269)
+									message.Consumer = Consumers.Inventory;
+								if (message.Id is (int)Opcodes.TeleportToWaypoint or (int)Opcodes.GambleMessage)
+									message.Consumer = Consumers.Player;
+								if (message.Consumer != Consumers.None)
+								{
+									if (message.Consumer == Consumers.ClientManager) ClientManager.Instance.Consume(this, message);
+									else Game.Route(this, message);
+								}
+								else if (message is ISelfHandler handler) handler.Handle(this);
+								else if (message.Id != 217)
+									Logger.Warn("{0} - ID:{1} has no consumer or self-handler.", message.GetType().Name, message.Id);
+							}
+							catch (NotImplementedException)
+							{
+								Logger.Warn("Unhandled game message: 0x{0:X4} {1}", message.Id, message.GetType().Name);
+							}
+						}
+						_incomingBuffer.Position = end;
+					}
+					// Keep an incomplete header/payload for the next socket receive.
+					_incomingBuffer.ConsumeData();
+				}
+				catch (Exception ex)
+				{
+					Logger.WarnException(ex, "Parse() exception: ");
+					Connection.Disconnect();
+				}
+			}
+		}
+
+		private const int WaitStatsSeconds = 30;
+		private readonly Stopwatch _waitStatsWatch = Stopwatch.StartNew();
+		private double _waitTimeTotal, _waitTimeMax;
+		private int _waitCount;
+
+		/// <summary>
+		/// Logs how long the client's data waited before being handled every <see cref="WaitStatsSeconds"/> seconds. It
+		/// waits for a thread pool thread and for the client's previous data, so long waits delay the player's actions
+		/// before the game sees them.
+		/// </summary>
+		private void RecordWait(double milliseconds)
+		{
+			_waitCount++;
+			_waitTimeTotal += milliseconds;
+			_waitTimeMax = Math.Max(_waitTimeMax, milliseconds);
+			if (_waitStatsWatch.Elapsed.TotalSeconds < WaitStatsSeconds) return;
+
+			Logger.Debug("Client data in the last {0}s: {1} packets, average wait {2:0.0} ms, slowest {3:0.0} ms.",
+				WaitStatsSeconds, _waitCount, _waitTimeTotal / _waitCount, _waitTimeMax);
+			_waitCount = 0;
+			_waitTimeTotal = _waitTimeMax = 0;
+			_waitStatsWatch.Restart();
 		}
 
 		public void SendMessage(Opcodes opcode) => SendMessage(new SimpleMessage(opcode));

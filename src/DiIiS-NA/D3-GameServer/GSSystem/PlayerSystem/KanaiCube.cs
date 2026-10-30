@@ -21,13 +21,14 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 	/// Kanai's Cube transmutes (<see cref="TransmuteItemsMessage"/>). The client sends only what's in the cube, so the
 	/// recipe is worked out from those items and materials, using the game's TransmuteRecipes table.
 	/// </summary>
-	internal static class KanaiCube
+	internal static partial class KanaiCube
 	{
 		private static readonly Logger Logger = LogManager.CreateLogger();
 
 		// TransmuteResultsMessage.Type
 		private const int ResultItem = 1;
 		private const int ResultCurrency = 2;
+		private const int ResultPower = 0;
 
 		// Error codes the client shows for a failed transmute (TransumteFailedMessage), from its table of errors
 		private const int Done = 0;
@@ -35,12 +36,15 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 		private const int ErrorUnidentifiedItem = 161; // TransmuteCannotUseUnidentifiedItem
 		private const int ErrorMissingCoreIngredients = 162; // TransmuteMissingCoreIngredients
 		private const int ErrorTransmuteFailed = 164; // TransmuteFailed
+		private const int ErrorPowerAlreadyExtracted = 165;
+		private const int ErrorPowerUnavailable = 166;
 		private const int ErrorCannotFindItem = 170; // TransmuteFailedCannotFindItem
 		private const int ErrorNotEnoughItemsInSet = 173; // TransmuteFailedNotEnoughItemsInSet
 
 		// TransmuteRecipeIngredient.Type values, from the recipes that use them
 		private const int IngredientItemGbid = 1;
 		private const int IngredientLegendary = 2;
+		private const int IngredientLegendaryPower = 3;
 		private const int IngredientRare = 4;
 		private const int IngredientSetItem = 5;
 		private const int IngredientNonLegendary = 8;
@@ -55,6 +59,15 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 
 		public static void Transmute(Player player, TransmuteItemsMessage message)
 		{
+			if (message.annItems == null || message.GBIDCurrencies == null ||
+				message.ItemsCount < 0 || message.ItemsCount > message.annItems.Length ||
+				message.CurrenciesCount < 0 || message.CurrenciesCount > message.GBIDCurrencies.Length ||
+				message.annItems.Take(message.ItemsCount).Distinct().Count() != message.ItemsCount ||
+				message.GBIDCurrencies.Take(message.CurrenciesCount).Distinct().Count() != message.CurrenciesCount)
+			{
+				Fail(player, ErrorMissingCoreIngredients, "invalid cube input counts or repeated ingredients");
+				return;
+			}
 			var items = message.annItems.Take(message.ItemsCount)
 				.Select(id => player.Inventory.GetItemByDynId(player, (uint)id))
 				.ToList();
@@ -86,6 +99,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 			Logger.Debug("Transmuting {0}: {1}.", recipe.Name, string.Join(", ", items.Select(i => i.ItemDefinition.Name)));
 			var result = recipe.TransmuteType switch
 			{
+				TransmuteType.EXTRACT_LEGENDARY_POWER => ExtractPower(player, recipe, items[0]),
 				TransmuteType.REFORGE_LEGENDARY => Replace(player, recipe, items[0],
 					ItemGenerator.CreateItemForClass(player, items[0].ItemDefinition, ItemGenerator.ClassFor(player, items[0].ItemType), 9)),
 				TransmuteType.UPGRADE_RARE_ITEM => Replace(player, recipe, items[0], UpgradedRare(player, items[0])),
@@ -149,6 +163,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 			{
 				IngredientItemGbid => item.GBHandle.GBID == ingredient.TypeValue,
 				IngredientLegendary => IsEquippable(item) && item.Quality >= 9,
+				IngredientLegendaryPower => IsEquippable(item) && item.Quality >= 9 && GetPower(item.GBHandle.GBID) != null,
 				// Level 70: the level requirement, which comes from the item's affixes; its base item can be lower.
 				IngredientRare => IsEquippable(item) && item.Quality is >= 6 and <= 8 &&
 				                  Math.Max(item.ItemLevel, item.Attributes[GameAttributes.Requirement, 57]) >= 70,

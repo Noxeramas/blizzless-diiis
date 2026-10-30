@@ -21,6 +21,9 @@ namespace DiIiS_NA.Core.Storage.AccountDataBase.Mapper
 			Map(e => e.FirstGem).Not.Nullable().Default("-1");
 			Map(e => e.SecondGem).Not.Nullable().Default("-1");
 			Map(e => e.ThirdGem).Not.Nullable().Default("-1");
+			Map(e => e.FirstGemRank).Not.Nullable().Default("1");
+			Map(e => e.SecondGemRank).Not.Nullable().Default("1");
+			Map(e => e.ThirdGemRank).Not.Nullable().Default("1");
 			Map(e => e.GbId);
 			Map(e => e.Version).Not.Nullable().Default("1");
 			Map(e => e.Count).Default("1");

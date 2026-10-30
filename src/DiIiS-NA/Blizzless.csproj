@@ -42,6 +42,7 @@
 	
   <ItemGroup>
     <ProjectReference Include="..\DiIiSNet\BZNET.csproj" />
+    <Compile Include="..\Shared\CombatMeterProtocol.cs" Link="Diagnostics\CombatMeterProtocol.cs" />
   </ItemGroup>
 
   <ItemGroup>

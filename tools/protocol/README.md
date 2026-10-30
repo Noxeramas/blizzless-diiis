@@ -27,6 +27,7 @@ This starts the game, waits 25 seconds, saves its `.data`/`.rdata` plus every at
 | `gamebalance_tables.py <snap>` | Every GameBalance table's element type and record size, in file order. |
 | `dump_field_type.py <snap> <Type> <field>...` | The type of given fields of a type (picks the descriptor with the most fields when names repeat). |
 | `protodump.py <exe> <proto-name>...` | Embedded protobuf definitions (Battle.net services and messages). |
+| `trace_client_clock.py <output.jsonl> [--seconds 120]` | Reads received/playback ticks and queued-message count from an already-running 2.8.0.99920 client to locate playback stalls. Verifies the executable hash; never writes client memory. |
 
 ## Game data
 

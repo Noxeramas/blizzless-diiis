@@ -31,6 +31,33 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 		/// </summary>
 		[ThreadStatic] internal static ToonClass? OwnerClass;
 
+		/// <summary>
+		/// The Ancient_Rank a level-70 legendary or set item being created gets (0 normal, 1 ancient), or null to roll it
+		/// (<see cref="AncientChance"/>). Set around item creation, as for <see cref="OwnerClass"/>, by !item.
+		/// </summary>
+		[ThreadStatic] internal static int? ForcedAncientRank;
+
+		// Live: 10% of level-70 legendary and set items are ancient, from gambling, crafting and the cube and from drops on
+		// Torment VI and up. Lower Torment levels are said to have lower odds, which no source gives.
+		private const double AncientChance = 0.1;
+
+		// Every affix by GBID, including those AllAffix leaves out (the 21x_ ancient tiers).
+		private static readonly Dictionary<int, AffixTable> AffixesByHash = new();
+
+		/// <summary>
+		/// The tier a legendary rolls instead of <paramref name="affix"/>: as on live, a legendary or set item takes the
+		/// tier its level covers and moves it up once (LegendaryUprankAffix), and an ancient one twice. A level-70 pair of
+		/// boots rolls Intelligence 416-500 (1xx_Int 17 Secondary) and an ancient one 550-650 (1xx_Int 18 Secondary),
+		/// rather than the level-70 tier's 350-415. Tiers that don't move up (percentages, such as critical hit chance)
+		/// stay as they are, as an ancient's do on live.
+		/// </summary>
+		private static AffixTable Upranked(AffixTable affix, int times)
+		{
+			for (int i = 0; i < times && AffixesByHash.TryGetValue(affix.LegendaryUprankAffix, out var higher); i++)
+				affix = higher;
+			return affix;
+		}
+
 		private static readonly (ToonClass Toon, ItemFlags Flag, Class Class)[] Classes =
 		{
 			(ToonClass.DemonHunter, ItemFlags.DemonHunter, Class.DemonHunter),
@@ -115,6 +142,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 					foreach (var affixDef in data.Affixes)
 					{
 						FullAffixList.Add(affixDef);
+						AffixesByHash.TryAdd(affixDef.Hash, affixDef);
 
 						if (affixDef.I0 > 8)
 							affixDef.I0 -= 8;
@@ -215,6 +243,12 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 				isUnique = true;
 			}
 
+			// Ancient (Ancient_Rank, which the client shows), and how far its tiers move up (see Upranked)
+			if (isUnique && !isEthereal && item.ItemLevel >= 70)
+				item.Attributes[GameAttributes.Ancient_Rank] =
+					ForcedAncientRank ?? (RandomHelper.NextDouble() < AncientChance ? 1 : 0);
+			int upranks = !isUnique ? 0 : item.Attributes[GameAttributes.Ancient_Rank] > 0 ? 2 : 1;
+
 
 			if (item.GBHandle.GBID == -4139386) affixesCount = 6; //referral ring
 
@@ -257,8 +291,10 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 				for (int i = 0; i < 6; i++)
 				{
 					var fixedAffix = FindSuitableAffix(item, item.ItemDefinition.LegendaryAffixFamily[i], item.ItemDefinition.MaxAffixLevel[i], (item.ItemDefinition.I38[i] == 1));
+					if (AffixesByHash.TryGetValue(fixedAffix, out var found))
+						fixedAffix = Upranked(found, upranks).Hash;
 					AddAffix(item, fixedAffix, true);
-					if (AllAffix.FirstOrDefault(a => a.Hash == fixedAffix) is { } added)
+					if (AffixesByHash.TryGetValue(fixedAffix, out var added))
 					{
 						taken.Add(added.AffixFamily0);
 						if (added.AffixFamily1 != -1)
@@ -317,7 +353,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 			selectedGroups.AddRange(Roll(pool, affixesCount, taken));
 
 			int n = 0;
-			foreach (var def in selectedGroups)
+			foreach (var def in selectedGroups.Select(rolled => rolled == null ? null : Upranked(rolled, upranks)))
 			{
 				if (def != null)
 				{
@@ -450,8 +486,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 
 			if (findFromTotal)
 			{
-				definition = AllAffix.FirstOrDefault(def => def.Hash == affixGbId);
-				var testc = AllAffix.FirstOrDefault(def => def.ItemGroup[0] == affixGbId || def.ItemGroup[1] == affixGbId);
+				definition = AffixesByHash.GetValueOrDefault(affixGbId);
 			}
 			else
 			{
@@ -536,7 +571,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 			}
 			foreach (var affix in target.AffixList)
 			{
-				var definition = AllAffix.Single(def => def.Hash == affix.AffixGbid);
+				var definition = AffixesByHash[affix.AffixGbid];
 
 				foreach (var effect in definition.AttributeSpecifier)
 				{

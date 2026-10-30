@@ -1506,12 +1506,12 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 			{
 				_owner.InGameClient.SendMessage(new GemNotificationMessage());
 
-				_inventoryGrid.AddItem(ItemGenerator.CookFromDefinition(_owner.World, ItemGenerator.GetItemDefinition(item.DBInventory.FirstGem)));
+				_inventoryGrid.AddItem(ItemGenerator.CookGem(_owner.World, item.DBInventory.FirstGem, item.DBInventory.FirstGemRank));
 
 				if (item.DBInventory.SecondGem != -1)
-					_inventoryGrid.AddItem(ItemGenerator.CookFromDefinition(_owner.World, ItemGenerator.GetItemDefinition(item.DBInventory.SecondGem)));
+					_inventoryGrid.AddItem(ItemGenerator.CookGem(_owner.World, item.DBInventory.SecondGem, item.DBInventory.SecondGemRank));
 				if (item.DBInventory.ThirdGem != -1)
-					_inventoryGrid.AddItem(ItemGenerator.CookFromDefinition(_owner.World, ItemGenerator.GetItemDefinition(item.DBInventory.ThirdGem)));
+					_inventoryGrid.AddItem(ItemGenerator.CookGem(_owner.World, item.DBInventory.ThirdGem, item.DBInventory.ThirdGemRank));
 
 				foreach (var gem in item.Gems)
 					gem.Unreveal(_owner);
@@ -1643,12 +1643,12 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 			{
 				_owner.InGameClient.SendMessage(new GemNotificationMessage());
 
-				_inventoryGrid.AddItem(ItemGenerator.CookFromDefinition(_owner.World, ItemGenerator.GetItemDefinition(item.DBInventory.FirstGem)));
+				_inventoryGrid.AddItem(ItemGenerator.CookGem(_owner.World, item.DBInventory.FirstGem, item.DBInventory.FirstGemRank));
 
 				if (item.DBInventory.SecondGem != -1)
-					_inventoryGrid.AddItem(ItemGenerator.CookFromDefinition(_owner.World, ItemGenerator.GetItemDefinition(item.DBInventory.SecondGem)));
+					_inventoryGrid.AddItem(ItemGenerator.CookGem(_owner.World, item.DBInventory.SecondGem, item.DBInventory.SecondGemRank));
 				if (item.DBInventory.ThirdGem != -1)
-					_inventoryGrid.AddItem(ItemGenerator.CookFromDefinition(_owner.World, ItemGenerator.GetItemDefinition(item.DBInventory.ThirdGem)));
+					_inventoryGrid.AddItem(ItemGenerator.CookGem(_owner.World, item.DBInventory.ThirdGem, item.DBInventory.ThirdGemRank));
 
 				foreach (var gem in item.Gems)
 					gem.Unreveal(_owner);
@@ -2035,14 +2035,17 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 			{
 				case 1:
 					item.DBInventory.FirstGem = gem.GBHandle.GBID;
+					item.DBInventory.FirstGemRank = gem.Attributes[GameAttributes.Jewel_Rank];
 					_owner.World.Game.GameDbSession.SessionUpdate(item.DBInventory);
 					break;
 				case 2:
 					item.DBInventory.SecondGem = gem.GBHandle.GBID;
+					item.DBInventory.SecondGemRank = gem.Attributes[GameAttributes.Jewel_Rank];
 					_owner.World.Game.GameDbSession.SessionUpdate(item.DBInventory);
 					break;
 				case 3:
 					item.DBInventory.ThirdGem = gem.GBHandle.GBID;
+					item.DBInventory.ThirdGemRank = gem.Attributes[GameAttributes.Jewel_Rank];
 					_owner.World.Game.GameDbSession.SessionUpdate(item.DBInventory);
 					break;
 			}
@@ -2095,14 +2098,14 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 
 			if (item.DBInventory.FirstGem != -1)
 			{
-				PickUp(ItemGenerator.CookFromDefinition(_owner.World, ItemGenerator.GetItemDefinition(item.DBInventory.FirstGem)));
+				PickUp(ItemGenerator.CookGem(_owner.World, item.DBInventory.FirstGem, item.DBInventory.FirstGemRank));
 			}
 
 			if (item.DBInventory.SecondGem != -1)
-				PickUp(ItemGenerator.CookFromDefinition(_owner.World, ItemGenerator.GetItemDefinition(item.DBInventory.SecondGem)));
+				PickUp(ItemGenerator.CookGem(_owner.World, item.DBInventory.SecondGem, item.DBInventory.SecondGemRank));
 
 			if (item.DBInventory.ThirdGem != -1)
-				PickUp(ItemGenerator.CookFromDefinition(_owner.World, ItemGenerator.GetItemDefinition(item.DBInventory.ThirdGem)));
+				PickUp(ItemGenerator.CookGem(_owner.World, item.DBInventory.ThirdGem, item.DBInventory.ThirdGemRank));
 
 			item.DBInventory.FirstGem = -1;
 			item.DBInventory.SecondGem = -1;
@@ -2116,6 +2119,11 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 			item.Gems.Clear();
 			item.Attributes[GameAttributes.Sockets_Filled] = 0;
 			item.Attributes.BroadcastChangedIfRevealed();
+
+			// an equipped item loses its gems' bonuses, Legacy of Dreams' too
+			_owner.SetAttributesByItems();
+			_owner.SetAttributesByItemProcs();
+			_owner.SetAttributesByGems();
 
 			_owner.GrantAchievement(74987243307789);
 		}
@@ -2571,14 +2579,17 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 			if (item.Gems.Count > 0)
 			{
 				item.DBInventory.FirstGem = item.Gems[0].GBHandle.GBID;
+				item.DBInventory.FirstGemRank = item.Gems[0].Attributes[GameAttributes.Jewel_Rank];
 
 				if (item.Gems.Count > 1)
 				{
 					item.DBInventory.SecondGem = item.Gems[1].GBHandle.GBID;
+					item.DBInventory.SecondGemRank = item.Gems[1].Attributes[GameAttributes.Jewel_Rank];
 
 					if (item.Gems.Count > 2)
 					{
 						item.DBInventory.ThirdGem = item.Gems[2].GBHandle.GBID;
+						item.DBInventory.ThirdGemRank = item.Gems[2].Attributes[GameAttributes.Jewel_Rank];
 					}
 				}
 			}
@@ -2626,6 +2637,25 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 			//Logger.Debug("ChangeItemSlotDB success, item dbid: {0}", item.DBInventory.Id);
 		}
 
+		public void SaveSocketedGemRank(Item item, Item gem)
+		{
+			var rank = gem.Attributes[GameAttributes.Jewel_Rank];
+			switch (item.Gems.IndexOf(gem))
+			{
+				case 0: item.DBInventory.FirstGemRank = rank; break;
+				case 1: item.DBInventory.SecondGemRank = rank; break;
+				case 2: item.DBInventory.ThirdGemRank = rank; break;
+			}
+			_owner.World.Game.GameDbSession.SessionUpdate(item.DBInventory);
+		}
+
+		// Whether an equipped set gives a bonus, as SetItemSetBonuses applies them
+		public bool HasSetBonus()
+		{
+			return GetEquippedItems().Where(i => i.ItemDefinition.SNOSet != -1).GroupBy(i => i.ItemDefinition.SNOSet)
+				.Any(set => Enumerable.Range(1, set.Count()).Any(count => ItemGenerator.GetItemSetEffectDefinition(set.Key, count) != null));
+		}
+
 		public void ChangeItemLocationDB(int locX, int locY, Item item)
 		{
 			//Logger.Trace("ChangeItemLocationDB");
@@ -2663,6 +2693,9 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 
 		public float GetItemBonus(GameAttributeF attributeF, int attributeKey)
 		{
+			if (attributeF == GameAttributes.Item_Power_Passive &&
+				_owner.CubedPowerValues != null && _owner.CubedPowerValues.TryGetValue(attributeKey, out var cubed))
+				return cubed; // A cubed power replaces the same equipped effect; it never adds a second copy.
 			return Loaded ? GetEquippedItems().Where(item => item.Attributes[GameAttributes.Durability_Cur] > 0 || item.Attributes[GameAttributes.Durability_Max] == 0).Sum(item => item.Attributes[attributeF, attributeKey]) : _owner.Attributes[attributeF];
 		}
 
@@ -2686,6 +2719,10 @@ namespace DiIiS_NA.GameServer.GSSystem.PlayerSystem
 						if (attr.AttributeId > 0)
 							if (FormulaScript.Evaluate(attr.Formula.ToArray(), new ItemRandomHelper(35674658), out result))
 							{
+								// Leoric's Crown stores its power directly in Gem_Attributes_Multiplier.
+								// It amplifies normal gems in this helm only, never legendary gems.
+								if (equip.EquipGemType == 3851110 && !gem.ItemDefinition.Name.StartsWith("Unique_Gem_", StringComparison.OrdinalIgnoreCase))
+									result *= 1f + equip.Attributes[GameAttributes.Gem_Attributes_Multiplier];
 								//Logger.Info("attr: {0},	{1}	{2}", attr.AttributeId, attr.SNOParam, result);
 								var attrib = GameAttributes.Attributes[attr.AttributeId] as GameAttributeF;
 								//if (attrib == GameAttribute.Dexterity_Item || attrib == GameAttribute.Vitality_Item || attrib == GameAttribute.Strength_Item || attrib == GameAttribute.Intelligence_Item) result /= 1065353216; //dat shit is crazy

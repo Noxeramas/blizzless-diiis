@@ -1,4 +1,4 @@
-﻿using DiIiS_NA.Core.Helpers.Math;
+using DiIiS_NA.Core.Helpers.Math;
 using DiIiS_NA.Core.Logging;
 using DiIiS_NA.D3_GameServer.Core.Types.SNO;
 using DiIiS_NA.GameServer.Core.Types.TagMap;
@@ -16,14 +16,52 @@ using DiIiS_NA.LoginServer.Toons;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
+using D3Offline.CombatMeter;
 
 namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 {
 	public class HitPayload : Payload
 	{
 		public static readonly Logger Logger = LogManager.CreateLogger();
-		public float TotalDamage { get; set; }
+		private float _totalDamage;
+		private bool _traceReady;
+		public CombatHit MeterHit { get; private set; }
+		public float TotalDamage
+		{
+			get => _totalDamage;
+			set
+			{
+				if (_traceReady && MeterHit != null && value != _totalDamage)
+					TraceChange("Other server adjustment", _totalDamage, value, "Adjustment");
+				_totalDamage = value;
+			}
+		}
+
+		private void ScaleDamage(float factor, string name, string bucket = MeterProtocol.Unverified,
+			string source = "", string kind = "Multiplier")
+		{
+			var before = _totalDamage;
+			_totalDamage *= factor;
+			if (MeterHit != null && (factor != 1f || source.Length != 0))
+				MeterHit.Factors.Add(new DamageFactor { Name = name, Before = before, After = _totalDamage,
+					Multiplier = factor, Kind = kind, ReferenceBucket = bucket, Source = source,
+					Evidence = bucket == MeterProtocol.Unverified ? "Live rule unverified" : "Published reference; current-client parity pending" });
+		}
+
+		private void TraceChange(string name, float before, float after, string kind)
+		{
+			MeterHit?.Factors.Add(new DamageFactor { Name = name, Before = before, After = after,
+				Multiplier = before == 0 ? 1 : after / (double)before, Kind = kind });
+		}
+
+		public int BeginBuffTrace() => MeterHit?.Factors.Count ?? -1;
+		public void EndBuffTrace(Buff buff, int firstStep)
+		{
+			if (MeterHit == null || firstStep < 0) return;
+			for (var i = firstStep; i < MeterHit.Factors.Count; i++)
+				if (MeterHit.Factors[i].Name == "Other server adjustment")
+					MeterHit.Factors[i].Name = CombatMeter.BuffName(buff);
+		}
 		public DamageType DominantDamageType { get; set; }
 		public Dictionary<DamageType, float> ElementDamages { get; set; }
 		public bool IsCriticalHit { get; set; }
@@ -35,12 +73,6 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 
 		public bool AutomaticHitEffects = true;
 		public Action<DeathPayload> OnDeath = null;
-
-		private bool WaitTo(TickTimer timer)
-		{
-			while (timer.TimedOut != true) ;
-			return true;
-		}
 
 		public HitPayload(AttackPayload attackPayload, bool criticalHit, Actor target)
 			: base(attackPayload.Context, target)
@@ -64,12 +96,15 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 					return;
 			
 			Successful = true;
+			MeterHit = CombatMeter.Begin(Context.User, Target, Context.PowerSNO, criticalHit, Context.IsItemProc);
 
 			//float weaponMinDamage = this.Context.User.Attributes[GameAttribute.Damage_Weapon_Min_Total, 0];
 			//float weaponDamageDelta = this.Context.User.Attributes[GameAttribute.Damage_Weapon_Delta_Total, 0];
 
 			// calculate and add up damage amount for each element type
 			ElementDamages = new Dictionary<DamageType, float>();
+			var elementalOwner = (Context.User as Minion)?.Master ?? Context.User;
+			var convention = elementalOwner.World.BuffManager.GetFirstBuff<ConventionBuff>(elementalOwner);
 
 			foreach (var entry in attackPayload.DamageEntries)
 			{
@@ -105,7 +140,19 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 						break;
 				}
 				
-				ElementDamages[entry.DamageType] *= 1f + Context.User.Attributes[GameAttributes.Damage_Type_Percent_Bonus, (int)entry.DamageType.HitEffect] + Context.User.Attributes[GameAttributes.Damage_Dealt_Percent_Bonus, (int)entry.DamageType.HitEffect];
+				var elementBase = ElementDamages[entry.DamageType];
+				var elementSource = EquippedLegendaryPowers.Has(elementalOwner, EquippedLegendaryPowers.StoneOfJordan) ? elementalOwner : Context.User;
+				var elementFactor = 1f + elementSource.Attributes[GameAttributes.Damage_Type_Percent_Bonus, (int)entry.DamageType.HitEffect] + elementSource.Attributes[GameAttributes.Damage_Dealt_Percent_Bonus, (int)entry.DamageType.HitEffect];
+				ElementDamages[entry.DamageType] *= elementFactor;
+				if (MeterHit != null)
+				{
+					if (attackPayload.DamageEntries.Count == 1) MeterHit.BaseDamage = elementBase;
+					MeterHit.Factors.Add(new DamageFactor { Name = "Element attributes · " + entry.DamageType.HitEffect,
+						Before = elementBase, After = ElementDamages[entry.DamageType], Multiplier = elementFactor,
+						Kind = attackPayload.DamageEntries.Count == 1 ? "Multiplier" : "Component",
+						Source = "Damage_Type_Percent_Bonus + Damage_Dealt_Percent_Bonus; attribute mapping unverified" });
+				}
+
 
 				if (Target.Attributes[GameAttributes.Immunity, (int)entry.DamageType.HitEffect] == true) ElementDamages[entry.DamageType] = 0f; //Immunity
 
@@ -131,7 +178,30 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 				}
 			}
 
+			// Apply Convention once to each completed elemental component. Multiple entries
+			// of the same element must not re-multiply damage already accumulated.
+			if (convention != null)
+				foreach (var element in ElementDamages.Keys.ToArray())
+				{
+					float factor = 1f + convention.Bonus(element.AttributeKey);
+					float before = ElementDamages[element];
+					ElementDamages[element] *= factor;
+					if (MeterHit != null && factor != 1f)
+						MeterHit.Factors.Add(new DamageFactor { Name = "Convention of Elements", Before = before,
+							After = ElementDamages[element], Multiplier = factor, ReferenceBucket = MeterProtocol.Independent,
+							Kind = ElementDamages.Count == 1 ? "Multiplier" : "Component",
+							Source = CombatMeter.ItemSource(elementalOwner, EquippedLegendaryPowers.Convention, element.HitEffect.ToString()) });
+				}
+
 			TotalDamage = ElementDamages.Sum(kv => kv.Value);
+			_traceReady = true;
+			if (MeterHit != null)
+			{
+				if (attackPayload.DamageEntries.Count != 1) MeterHit.BaseDamage = TotalDamage;
+				var previous = MeterHit.Factors.LastOrDefault();
+				if (attackPayload.DamageEntries.Count == 1 && previous != null && previous.After != TotalDamage)
+					TraceChange("Element immunity / resistance", (float)previous.After, TotalDamage, "Mitigation");
+			}
 
 			if (Context.User.Attributes[GameAttributes.God] == true)
 				TotalDamage = 0f;
@@ -139,7 +209,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 			// apply critical damage boost
 			if (criticalHit)
 			{
-				TotalDamage *= (1f + Context.User.Attributes[GameAttributes.Crit_Damage_Percent]);
+				ScaleDamage(1f + Context.User.Attributes[GameAttributes.Crit_Damage_Percent], "Critical hit", kind: "Critical");
 				if (Context.User is Player player && player.Toon.Class == ToonClass.Wizard && player.Attributes[GameAttributes.Resource_On_Crit, 1] > 0)
 					if (FastRandom.Instance.NextDouble() < Context.GetProcCoefficient())
 						(Context.User as Player).GeneratePrimaryResource(Context.User.Attributes[GameAttributes.Resource_On_Crit, 1]);
@@ -148,28 +218,47 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 			var targetArmor = target.Attributes[GameAttributes.Armor_Total];
 			var attackerLevel = attackPayload.Context.User.Attributes[GameAttributes.Level];
 
-			TotalDamage *= ReductionFromArmor(targetArmor, attackerLevel);
+			ScaleDamage(ReductionFromArmor(targetArmor, attackerLevel), "Target armor", kind: "Mitigation");
 
 			//this.TotalDamage *= 1f - target.Attributes[GameAttribute.Armor_Bonus_Percent];
 			//this.TotalDamage *= 1f + target.Attributes[GameAttribute.Amplify_Damage_Percent];
 			//this.TotalDamage *= 1f + attackPayload.Context.User.Attributes[GameAttribute.Multiplicative_Damage_Percent_Bonus_No_Pets];
-			TotalDamage *= 1f - attackPayload.Context.User.Attributes[GameAttributes.Damage_Done_Reduction_Percent];
-			TotalDamage *= 1f + Context.User.Attributes[GameAttributes.Power_Damage_Percent_Bonus, attackPayload.Context.PowerSNO];
+			ScaleDamage(1f - attackPayload.Context.User.Attributes[GameAttributes.Damage_Done_Reduction_Percent], "Damage done reduction", kind: "Mitigation");
+			ScaleDamage(1f + Context.User.Attributes[GameAttributes.Power_Damage_Percent_Bonus, attackPayload.Context.PowerSNO], "Skill damage bonus", MeterProtocol.Additive);
+			var damageOwner = (Context.User as Minion)?.Master ?? Context.User;
+			ScaleDamage(1f + (damageOwner.World.BuffManager.GetFirstBuff<MantleOfChannelingBuff>(damageOwner)?.DamageBonus ?? 0f), "Mantle of Channeling", MeterProtocol.Independent, CombatMeter.ItemSource(damageOwner, MantleOfChannelingBuff.ItemPowerSNO, "requires channeling"));
+			ScaleDamage(1f - (Target.World.BuffManager.GetFirstBuff<MantleOfChannelingBuff>(Target)?.DamageReduction ?? 0f), "Mantle incoming reduction", kind: "Mitigation");
+			ScaleDamage(1f - (Target.World.BuffManager.GetFirstBuff<FlameWardBuff>(Target)?.DamageReduction ?? 0f), "Flame Ward", kind: "Mitigation");
+			ScaleDamage(1f - (Target.World.BuffManager.GetFirstBuff<AquilaBuff>(Target)?.DamageReduction ?? 0f), "Aquila Cuirass", kind: "Mitigation");
+			ScaleDamage(1f + (damageOwner.World.BuffManager.GetFirstBuff<SquirtsBuff>(damageOwner)?.DamageBonus ?? 0f), "Squirt's Necklace", MeterProtocol.Independent,
+				CombatMeter.ItemSource(damageOwner, EquippedLegendaryPowers.Squirts, "10% per stack"));
+			ScaleDamage(1f + (Target.World.BuffManager.GetFirstBuff<SquirtsBuff>(Target)?.DamageTakenBonus ?? 0f), "Squirt's incoming penalty", kind: "Mitigation");
+			if (Context.PowerSNO == SkillsSystem.Skills.Wizard.Offensive.EnergyTwister)
+			{
+				if (Context.User is Player twisterOwner)
+				{
+					ScaleDamage(1f + twisterOwner.GetLegendaryPowerValue(EnergyTwister.ValtheksRebukePowerSNO), "Valthek's Rebuke", MeterProtocol.Independent, CombatMeter.ItemSource(twisterOwner, EnergyTwister.ValtheksRebukePowerSNO, "Energy Twister"));
+					ScaleDamage(1f + twisterOwner.GetLegendaryPowerValue(EnergyTwister.RanslorsFollyPowerSNO), "Ranslor's Folly", MeterProtocol.Independent, CombatMeter.ItemSource(twisterOwner, EnergyTwister.RanslorsFollyPowerSNO, "Energy Twister"));
+				}
+				ScaleDamage(1f + (Context.User.World.BuffManager.GetFirstBuff<EtchedSigilBuff>(Context.User)?.DamageBonus ?? 0f), "Etched Sigil", MeterProtocol.Independent, CombatMeter.ItemSource(Context.User, EtchedSigilBuff.ItemPowerSNO, "Twister while channeling"));
+				ScaleDamage(1f + (Context.User.World.BuffManager.GetFirstBuff<TwistedSwordBuff>(Context.User)?.DamageBonus ?? 0f), "Twisted Sword", MeterProtocol.Independent, CombatMeter.ItemSource(Context.User, TwistedSwordBuff.ItemPowerSNO, "roll × active casts, capped at 3"));
+			}
 
 			if (PowerMath.Distance2D(Context.User.Position, Target.Position) < 6f)
-				TotalDamage *= 1f - Target.Attributes[GameAttributes.Damage_Percent_Reduction_From_Melee];
+				ScaleDamage(1f - Target.Attributes[GameAttributes.Damage_Percent_Reduction_From_Melee], "Melee reduction", kind: "Mitigation");
 			else
-				TotalDamage *= 1f - Target.Attributes[GameAttributes.Damage_Percent_Reduction_From_Ranged];
+				ScaleDamage(1f - Target.Attributes[GameAttributes.Damage_Percent_Reduction_From_Ranged], "Ranged reduction", kind: "Mitigation");
 
 			DominantDamageType = ElementDamages.OrderByDescending(kv => kv.Value).FirstOrDefault().Key;
 			if (DominantDamageType == null) DominantDamageType = DamageType.Physical;
+			if (MeterHit != null) MeterHit.Element = DominantDamageType.HitEffect.ToString();
 
 			switch (Context.User)
 			{
 				case Player plr:
 					if (IsWeaponDamage)
 					{
-						TotalDamage = TotalDamage * (1 + (plr.PrimaryAttribute / 100f));
+						ScaleDamage(1 + (plr.PrimaryAttribute / 100f), "Primary attribute", kind: "Primary stat");
 						if (FastRandom.Instance.NextDouble() < Context.GetProcCoefficient())
 							plr.GeneratePrimaryResource(plr.Attributes[GameAttributes.Resource_On_Hit]);
 
@@ -257,58 +346,58 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 
 								if (plr.SkillSet.HasPassive(226301)) //ColdBlooded (Wizard)
 									if (Target.Attributes[GameAttributes.Frozen] || Target.Attributes[GameAttributes.Chilled])
-										TotalDamage *= 1.1f;
+										ScaleDamage(1.1f, "Cold Blooded", MeterProtocol.Additive);
 
 								if (plr.SkillSet.HasPassive(208471)) //GlassCannon (Wizard)
-									TotalDamage *= 1.15f;
+									ScaleDamage(1.15f, "Glass Cannon", MeterProtocol.Additive);
 
 								if (Target.World.BuffManager.HasBuff<EnergyTwister.GaleForceDebuff>(Target))      //Wizard -> Gale Force
 									if (DominantDamageType == DamageType.Fire)
-										TotalDamage *= (1f + (Target.World.BuffManager.GetFirstBuff<EnergyTwister.GaleForceDebuff>(Target).Percentage));
+										ScaleDamage(1f + Target.World.BuffManager.GetFirstBuff<EnergyTwister.GaleForceDebuff>(Target).Percentage, "Gale Force", MeterProtocol.Additive);
 
 								if (Target.World.BuffManager.HasBuff<WizardWaveOfForce.StaticPulseDebuff>(Target))        //Wizard -> Static Pulse
 									if (DominantDamageType == DamageType.Lightning)
-										TotalDamage *= (1f + (Target.World.BuffManager.GetFirstBuff<WizardWaveOfForce.StaticPulseDebuff>(Target).Percentage));
+										ScaleDamage(1f + Target.World.BuffManager.GetFirstBuff<WizardWaveOfForce.StaticPulseDebuff>(Target).Percentage, "Static Pulse");
 
 								if (Target.World.BuffManager.HasBuff<WizardRayOfFrost.SnowBlastDebuff>(Target))       //Wizard -> Snow Blast
 									if (DominantDamageType == DamageType.Cold)
-										TotalDamage *= (1f + (Target.World.BuffManager.GetFirstBuff<WizardRayOfFrost.SnowBlastDebuff>(Target).Percentage));
+										ScaleDamage(1f + Target.World.BuffManager.GetFirstBuff<WizardRayOfFrost.SnowBlastDebuff>(Target).Percentage, "Snow Blast", MeterProtocol.Additive);
 
 								if (Target.World.BuffManager.HasBuff<WizardDisintegrate.IntensifyDebuff>(Target))     //Wizard -> Intensify
 									if (DominantDamageType == DamageType.Arcane)
-										TotalDamage *= (1f + (Target.World.BuffManager.GetFirstBuff<WizardDisintegrate.IntensifyDebuff>(Target).Percentage));
+										ScaleDamage(1f + Target.World.BuffManager.GetFirstBuff<WizardDisintegrate.IntensifyDebuff>(Target).Percentage, "Intensify", MeterProtocol.Additive);
 
 								if (plr.World.BuffManager.HasBuff<WizardSpectralBlade.FlameBuff>(plr))      //Wizard -> Flame Blades
 									if (DominantDamageType == DamageType.Fire)
-										TotalDamage *= (1f + (plr.World.BuffManager.GetFirstBuff<WizardSpectralBlade.FlameBuff>(plr).StackCount * 0.01f));
+										ScaleDamage(1f + plr.World.BuffManager.GetFirstBuff<WizardSpectralBlade.FlameBuff>(plr).StackCount * 0.01f, "Flame Blades", MeterProtocol.Elemental);
 
 								if (plr.World.BuffManager.HasBuff<ArcaneOrb.OrbShockBuff>(plr))     //Wizard -> Spark
 									if (DominantDamageType == DamageType.Lightning)
-										TotalDamage *= (1f + (plr.World.BuffManager.GetFirstBuff<ArcaneOrb.OrbShockBuff>(plr).StackCount * 0.02f));
+										ScaleDamage(1f + plr.World.BuffManager.GetFirstBuff<ArcaneOrb.OrbShockBuff>(plr).StackCount * 0.02f, "Spark", MeterProtocol.Independent);
 
 								if (plr.World.BuffManager.HasBuff<WizardWaveOfForce.AttuneBuff>(plr))       //Wizard -> Arcane Attunement
 									if (DominantDamageType == DamageType.Arcane)
-										TotalDamage *= (1f + (plr.World.BuffManager.GetFirstBuff<WizardWaveOfForce.AttuneBuff>(plr).StackCount * 0.04f));
+										ScaleDamage(1f + plr.World.BuffManager.GetFirstBuff<WizardWaveOfForce.AttuneBuff>(plr).StackCount * 0.04f, "Arcane Attunement", MeterProtocol.Independent);
 
 								if (plr.World.BuffManager.HasBuff<WizardBlackHole.ColdBuff>(plr))       //Wizard -> Absolute Zero
 									if (DominantDamageType == DamageType.Cold)
-										TotalDamage *= (1f + (plr.World.BuffManager.GetFirstBuff<WizardBlackHole.ColdBuff>(plr).StackCount * 0.03f));
+										ScaleDamage(1f + plr.World.BuffManager.GetFirstBuff<WizardBlackHole.ColdBuff>(plr).StackCount * 0.03f, "Absolute Zero", MeterProtocol.Elemental);
 
 								if (plr.World.BuffManager.HasBuff<WizardBlackHole.DamageBuff>(plr))     //Wizard -> SpellSteal
-									TotalDamage *= (1f + (plr.World.BuffManager.GetFirstBuff<WizardBlackHole.DamageBuff>(plr).StackCount * 0.03f));
+									ScaleDamage(1f + plr.World.BuffManager.GetFirstBuff<WizardBlackHole.DamageBuff>(plr).StackCount * 0.03f, "Spellsteal", MeterProtocol.Additive);
 
 								if (plr.World.BuffManager.HasBuff<DynamoBuff>(plr))     //Wizard -> Arcane Dynamo
 									if (plr.World.BuffManager.GetFirstBuff<DynamoBuff>(plr).StackCount >= 5)
 										if (Context.PowerSNO != 0x00007818 && Context.PowerSNO != 0x0000783F &&
 											Context.PowerSNO != 0x0001177C && Context.PowerSNO != 0x000006E5) //non-signature
 										{
-											TotalDamage *= 1.6f;
+											ScaleDamage(1.6f, "Arcane Dynamo");
 											plr.World.BuffManager.RemoveBuffs(plr, 208823);
 										}
 
 								if (plr.SkillSet.HasPassive(341540)) //Audacity (Wiz)
 									if (PowerMath.Distance2D(plr.Position, Target.Position) <= 15f)
-										TotalDamage *= 1.15f;
+										ScaleDamage(1.3f, "Audacity", MeterProtocol.Independent, "Target within 15 yards"); // Installed SF0 = 0.3.
 
 								if (plr.SkillSet.HasPassive(342326)) //Elemental Exposure (Wiz)
 								{
@@ -376,10 +465,10 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 						
 						if (Target is Monster monster) 
 						{
-							TotalDamage *= 1 + plr.Attributes[GameAttributes.Damage_Percent_Bonus_Vs_Monster_Type, monster.MonsterTypeValue];
+							ScaleDamage(1 + plr.Attributes[GameAttributes.Damage_Percent_Bonus_Vs_Monster_Type, monster.MonsterTypeValue], "Monster type bonus");
 
 							if (monster.Quality > 0) 
-								TotalDamage *= 1 + plr.Attributes[GameAttributes.Damage_Percent_Bonus_Vs_Elites];
+								ScaleDamage(1 + plr.Attributes[GameAttributes.Damage_Percent_Bonus_Vs_Elites], "Elite damage", "Elite damage");
 
 							if (attackPayload.Targets.Actors.Count == 1 && !(attackPayload.Context is Buff) && attackPayload.AutomaticHitEffects)
 							{
@@ -409,6 +498,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 
 						}
 					}
+					ScaleDamage(plr.LegacyOfDreamsDamage, "Legacy of Dreams", MeterProtocol.Independent, CombatMeter.LegacyOfDreamsSource(plr));
 					break;
 				case Minion mn:
 					TotalDamage *= (1 + (mn.PrimaryAttribute / 100f));
@@ -416,6 +506,8 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 
 					if (mn.Master is Player mstr)
 					{
+						ScaleDamage(mstr.LegacyOfDreamsDamage, "Legacy of Dreams", MeterProtocol.Independent, CombatMeter.LegacyOfDreamsSource(mstr));
+
 						if (mstr.SkillSet.HasPassive(209041) && mn is CorpseSpider or CorpseSpiderQueen)
 							mstr.World.BuffManager.AddBuff(mstr, mstr, new VisionQuestBuff());
 
@@ -540,6 +632,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 						}
 					}
 
+					ScaleDamage(playerTarget.LegacyOfDreamsDamageTaken, "Legacy of Dreams reduction", source: CombatMeter.LegacyOfDreamsSource(playerTarget), kind: "Mitigation");
 					TotalDamage *= 0.1f;
 					break;
 				}
@@ -591,6 +684,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 
 			if ((Target.Attributes[GameAttributes.Invulnerable] || Target.Attributes[GameAttributes.Immunity]) && Target.World != null)
 			{
+				CombatMeter.Record(MeterHit, 0, 0, 0, "Immune");
 				if (Target is not Minion)
 					Target.World.BroadcastIfRevealed(plr => new FloatingNumberMessage()
 					{
@@ -615,6 +709,7 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 
 					if (IsDodged)
 					{
+						CombatMeter.Record(MeterHit, 0, 0, 0, "Dodged");
 						playerActor.World.BroadcastIfRevealed(plr2 => new FloatingNumberMessage()
 						{
 							ActorID = Target.DynamicID(plr2),
@@ -679,6 +774,8 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 				}
 			}
 
+			if (Target is Player hitPlayer && TotalDamage > 0f)
+				EquippedLegendaryPowers.OnHit(hitPlayer);
 			Target.World?.BuffManager?.SendTargetPayload(Target, this);
 			if (Context.User != null)
 				Target.World?.BuffManager?.SendTargetPayload(Context.User, this);
@@ -687,10 +784,10 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 
 			if (Context.User is Player player)
 			{
-				CheckItemProcs(player);
+				if (!Context.IsItemProc) CheckItemProcs(player);
 				if (player.Attributes[GameAttributes.Steal_Health_Percent] > 0)
 					player.AddHP(TotalDamage * Context.User.Attributes[GameAttributes.Steal_Health_Percent]);
-				if (Context.User.Attributes[GameAttributes.Hitpoints_On_Hit] > 0)
+				if (!Context.IsItemProc && Context.User.Attributes[GameAttributes.Hitpoints_On_Hit] > 0)
 					player.AddHP(Context.User.Attributes[GameAttributes.Hitpoints_On_Hit]);
 				if (IsCriticalHit)
 					if (player.Toon.Class == ToonClass.Wizard)
@@ -745,8 +842,12 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 			}
 
 			// update hp
-			float newHp = Math.Max(Target.Attributes[GameAttributes.Hitpoints_Cur] - TotalDamage, 0f);
+			float oldHp = Target.Attributes[GameAttributes.Hitpoints_Cur];
+			float newHp = Math.Max(oldHp - TotalDamage, 0f);
 			Target.Attributes[GameAttributes.Hitpoints_Cur] = newHp;
+			if (newHp < oldHp)
+				Target.World.BuffManager.GetFirstBuff<SquirtsBuff>(Target)?.OnHealthDamage();
+			CombatMeter.Record(MeterHit, TotalDamage, oldHp, newHp);
 			Target.Attributes.BroadcastChangedIfRevealed();
 
 			//thorns
@@ -799,20 +900,10 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem.Payloads
 						{
 							// HACK: hardcoded animation speed/ticks, need to base those off hit recovery speed
 							Target.PlayAnimation(6, hitAni, 1.0f, 40);
-							foreach (var plr in Target.World.Players.Values)
-							{
-								if (Target.IsRevealedToPlayer(plr))
-								{
-									float backSpeed = Target.WalkSpeed;
-									Target.WalkSpeed = 0f;
-									TickTimer timeout = new SecondsTickTimer(Target.World.Game, 0.3f);
-									var boom = Task<bool>.Factory.StartNew(() => WaitTo(timeout));
-									boom.ContinueWith(_ =>
-									{
-										Target.WalkSpeed = backSpeed;
-									});
-								}
-							}
+							// a stunned target is held still already, and its stun puts the speed back
+							if (!Target.Attributes[GameAttributes.Stunned])
+								Target.World.BuffManager.AddBuff(Context.User, Target,
+									new HitRecoveryDebuff(TickTimer.WaitSeconds(Target.World.Game, 0.3f)));
 						}
 					}
 				}

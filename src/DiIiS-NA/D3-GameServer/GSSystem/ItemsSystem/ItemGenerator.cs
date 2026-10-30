@@ -1308,7 +1308,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 			string baseN = "Unique_";
 			string gemName = "Gem";
 
-			int gem_grade = RandomHelper.Next(1, 23);
+			int gem_grade = RandomHelper.Next(1, 24); // gems 001 to 023 (Legacy of Dreams)
 			gemName += string.Format("_0{0:00}", gem_grade) + "_x1";
 			return Cook((player as Player), baseN + gemName);
 		}
@@ -1332,7 +1332,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 			var itemDefinition = GetRandom(Items.Values
 				.Where(def => ItemGroup.HierarchyToHashList(ItemGroup.FromHash(def.ItemTypesGBID)).Contains(type.Hash))
 				.ToList());
-			return CreateItem(player, itemDefinition);
+			return CreateItemForClass(player, itemDefinition, player is Player p ? ClassFor(p, type) : ToonClass.Unknown);
 		}
 
 		private static ItemTable GetRandom(List<ItemTable> pool, bool isUnique = false)
@@ -1560,8 +1560,9 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 			? GameModsConfig.Instance.Items.UnidentifiedDropChances.HighQuality
 			: GameModsConfig.Instance.Items.UnidentifiedDropChances.NormalQuality);
 
-		// Allows cooking a custom item.
-		public static Item Cook(Player player, string name)
+		// Allows cooking a custom item, with its random affixes for the player's class (see ClassFor), as !item gives.
+		// A level-70 legendary is ancient if ancientRank is 1, not if it's 0, and 10% of the time if it's null.
+		public static Item Cook(Player player, string name, int? ancientRank = null)
 		{
 			int hash = StringHashHelper.HashItemName(name);
 			ItemTable definition = Items[hash];
@@ -1577,7 +1578,17 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 					definition.MaxAffixLevel[i] = player.Attributes[GameAttributes.Level];
 			}
 
-			return CookFromDefinition(player.World, definition);
+			AffixGenerator.OwnerClass = ClassFor(player, ItemGroup.FromHash(definition.ItemTypesGBID));
+			AffixGenerator.ForcedAncientRank = ancientRank;
+			try
+			{
+				return CookFromDefinition(player.World, definition);
+			}
+			finally
+			{
+				AffixGenerator.OwnerClass = null;
+				AffixGenerator.ForcedAncientRank = null;
+			}
 		}
 
 		// Allows cooking a custom item.
@@ -1596,6 +1607,18 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 				item.Attributes[GameAttributes.Item_Binding_Level_Override] = 1;
 
 			return item;
+		}
+
+		// A socketed gem, or one coming out of its socket: a legendary gem keeps the rank (Jewel_Rank) it was saved with.
+		public static Item CookGem(World world, int gbid, int rank)
+		{
+			var gem = CookFromDefinition(world, GetItemDefinition(gbid), 1);
+			if (gem.Attributes.Contains(GameAttributes.Jewel_Rank))
+			{
+				gem.Attributes[GameAttributes.Jewel_Rank] = rank;
+				gem.UpdateLegendaryGemAttributes();
+			}
+			return gem;
 		}
 
 		public static ItemTable GetItemDefinition(int gbid)
@@ -1754,11 +1777,11 @@ namespace DiIiS_NA.GameServer.GSSystem.ItemsSystem
 			owner.World.CachedItems[instance.Id] = itm;
 
 			if (instance.FirstGem != -1)
-				itm.Gems.Add(CookFromDefinition(owner.World, GetItemDefinition(instance.FirstGem), 1));
+				itm.Gems.Add(CookGem(owner.World, instance.FirstGem, instance.FirstGemRank));
 			if (instance.SecondGem != -1)
-				itm.Gems.Add(CookFromDefinition(owner.World, GetItemDefinition(instance.SecondGem), 1));
+				itm.Gems.Add(CookGem(owner.World, instance.SecondGem, instance.SecondGemRank));
 			if (instance.ThirdGem != -1)
-				itm.Gems.Add(CookFromDefinition(owner.World, GetItemDefinition(instance.ThirdGem), 1));
+				itm.Gems.Add(CookGem(owner.World, instance.ThirdGem, instance.ThirdGemRank));
 
 			for (int i = 0; i < itm.Gems.Count; i++)
 			{

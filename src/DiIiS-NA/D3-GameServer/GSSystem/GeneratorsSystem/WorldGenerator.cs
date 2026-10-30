@@ -1657,6 +1657,12 @@ namespace DiIiS_NA.GameServer.GSSystem.GeneratorsSystem
 				foreach (var tile in drlgParam.Tiles)
 				{
 					Logger.Trace("RandomGeneration: TileType: {0}", (TileTypes)tile.TileType);
+					// The stored tile lists predate the installed game, which no longer has a few of their scenes.
+					if (!MPQStorage.Data.Assets[SNOGroup.Scene].ContainsKey(tile.SNOScene))
+					{
+						Logger.Debug("RandomGeneration: skipping tile with scene {0}, which the game data does not have.", tile.SNOScene);
+						continue;
+					}
 					tiles.Add(tile.SNOScene, tile);
 				}
 

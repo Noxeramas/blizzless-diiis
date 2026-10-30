@@ -161,7 +161,11 @@ namespace DiIiS_NA.GameServer.GSSystem.PowerSystem
 					if (buffs[i] != null)
 						try
 						{
-							buffs[i].OnPayload(payload);
+							var buff = buffs[i];
+							var hit = payload as Payloads.HitPayload;
+							var firstStep = hit?.BeginBuffTrace() ?? -1;
+							buff.OnPayload(payload);
+							hit?.EndBuffTrace(buff, firstStep);
 						}
 						catch { }
 				}

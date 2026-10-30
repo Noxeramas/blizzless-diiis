@@ -18,6 +18,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 		//private int _totalDelay = 0;
 
 		private TickTimer Timer;
+		private WalkStep _step;
 		private bool Stucked = true;
 
 		public MoveToPointWithPathfindAction(Actor owner, Vector3D heading, float attackRadius = 6f)
@@ -45,7 +46,6 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 		private void Move()
 		{
 			Stucked = true;
-			Vector3D defaultPosition = Owner.Position;
 			Vector3D destPoint = PowerMath.TranslateDirection2D(Owner.Position, Heading, Owner.Position, Math.Min(MovementHelpers.GetDistance(Owner.Position, Heading), Owner.WalkSpeed * 60));
 			if (Owner.Spawner)
 				destPoint = Owner.Position;
@@ -80,20 +80,22 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 				Owner.Move(destPoint, MovementHelpers.GetFacingAngle(Owner, destPoint));
 				var delay = (int)(MovementHelpers.GetDistance(Owner.Position, destPoint) / Owner.WalkSpeed);
 				_lastDelay = delay + (6 - (delay % 6));
+				_step = new WalkStep(Owner, destPoint);
 
 			}
 			else
+			{
 				_lastDelay = 60;
+				_step = null;
+			}
 
 			Timer = TickTimer.WaitTicks(
 				Owner.World.Game,
 				_lastDelay,
 				(tick) =>
 				{
-					if (!Stucked && Owner.WalkSpeed > 0f)
-					{
-						Owner.Position = MovementHelpers.OnGround(Owner.World, MovementHelpers.GetMovementPosition(defaultPosition, Owner.WalkSpeed, MovementHelpers.GetFacingAngle(defaultPosition, destPoint), _lastDelay));
-					}
+					// The client stops at the destination; the delay is rounded up, so don't walk on past it.
+					_step?.Finish();
 
 					if (Owner == null ||
 						Owner.Attributes[GameAttributes.Hitpoints_Cur] == 0 ||
@@ -118,6 +120,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 
 		public override void Update(int tickCounter)
 		{
+			_step?.Follow();
 			if (Timer != null)
 				Timer.Update(tickCounter);
 		}
@@ -125,6 +128,7 @@ namespace DiIiS_NA.GameServer.GSSystem.ActorSystem.Movement
 		public override void Cancel(int tickCounter)
 		{
 			Done = true;
+			_step?.Follow();
 		}
 	}
 }
